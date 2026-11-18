@@ -546,10 +546,10 @@ def main():
             rows += [("dedup + " + n, b, ok) for n, b, ok in sub[1:] if not n.startswith("ref")]
         summary.append((f"{nm} {list(shp)} ({use})", raw, show(f"{nm} {list(shp)}: {use}", rows, raw)))
     # the key structs: fields as columns (each field delta-coded along the keys)
-    for path, nm, nk, nf, w, use in ((RH, "RH_KEYS", 88, 42, 4, "note-on + per block via v->k (pointer)"),
+    for path, nm, nk, nf, w, use in ((RH, "RH_KEYS", 88, 35, 4, "note-on + per block via v->k (pointer)"),
                                      (BA, "BAR_KEYS", 88, 62, 4, "note-on + per block via v->k (pointer)")):
         t = table(path, nm)
-        raw = {"RH_KEYS": 14784, "BAR_KEYS": 21824}[nm]
+        raw = {"RH_KEYS": 12320, "BAR_KEYS": 21824}[nm]
         nf = t.size // nk
         t = t.reshape(nk, nf)
         cols = [t[:, j] for j in range(nf)]

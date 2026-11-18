@@ -31,7 +31,7 @@
 /* ---- generated-table types (must match tools/gen_rhodes.py) */
 typedef struct { int32_t sh, ch, th, d, drel, cr, b; } rh_mode_t;
 typedef struct {
-    rh_mode_t m[5];
+    rh_mode_t m[4];
     int32_t off, gain, kill, hc, pk;
     uint16_t prate, life;
     uint8_t band, fam, res, pad;
@@ -508,7 +508,7 @@ static void rh_coef(const rh_mode_t *m, int32_t d30, int32_t t30, int32_t k16, i
  * so a note-on copies 4 words a mode instead of two rh_coef calls. Two buffers: the main loop fills the one the ISR
  * does not read, then publishes it (the ISR preempts the main loop, never the reverse). rh_init uses the published
  * one only when its stamp is the tuning and the decays of this note-on (no bend: the bend changes the tuning), else
- * rh_coef as before: the same integers either way (Gate R; tests/py/test_rh_cc.py). 2 x 88 x 5 x 16 B in the pool */
+ * rh_coef as before: the same integers either way (Gate R; tests/py/test_rh_cc.py). 2 x 88 x 4 x 16 B in the pool */
 typedef struct { int32_t e0, eps0, e1, eps1; } rh_cc_t;
 #ifndef RH_CC_SEC
 #define RH_CC_SEC ".pool.rh_cc"                 /* (FR_C1 builds, frodhes.c: .ramx) */

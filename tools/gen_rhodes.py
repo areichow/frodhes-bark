@@ -34,7 +34,7 @@ import tinebar as tbm      # noqa: E402
 GEN_VERSION = 1
 FS = 44100.0
 KEY_LO, KEY_HI = 21, 108
-NM = 5                      # V1 V2 O1 O2 H1
+NM = 4                      # V1 V2 O1 O2
 NBAND, NLAYER, PLEN = 5, 8, 64
 PU_N = 2048
 S_MAX_GAP2 = 32.0
@@ -222,7 +222,6 @@ def key_physics(p, n, L):
         t60 = Tot * tb["tine_t60_frac"] / (f[m] / f[0]) ** ex
         modes.append(dict(name=name, f=fq, t60=t60, t60_rel=min(t60, Trel),
                           amp=psi_c[m] * psi_t[m] / (2 * math.pi * f[m])))
-    modes.append(dict(name="H1", f=0.0, t60=1.0, t60_rel=1.0, amp=0.0))      # Phase 3
     return dict(midi=n, f0=f0, L=L, spring_g=ms * 1e3, ratios=[float(f[1] / f[0]), float(f[2] / f[0])],
                 band=band_of(p, n), fam=family_of(p, n), modes=modes,
                 off=p["pickup"]["off_gap"] + p.get("jitter", {}).get("off_gap", 0.0) * jit(p, n, "off"),
