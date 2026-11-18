@@ -20,12 +20,13 @@ def test_decoder_bit_exact(tmp_path):
     src = open(os.path.join(ROOT, "firmware", "src", "rhodes.c")).read()
     a = src.index("static const int16_t *rh_pz(")
     b = src.index("\n}\n", src.index("static void rh_pz_mix(")) + 3
-    rp, bp = gz.bank(gz.RH, "RH_PULSE"), gz.bank(gz.BA, "BAR_PULSE")
+    rp, bp, wp = gz.bank(gz.RH, "RH_PULSE"), gz.bank(gz.BA, "BAR_PULSE"), gz.bank(gz.WU, "WU_PULSE")
     ws = (1, 7, 4096, 16384, 20000, 32767)
     c = ["#include <stdint.h>", "#include <stdio.h>", "#define FR_RAM2",   # (frodhes.c: RAM on the one-core FM-1)
          '#include "%s"' % os.path.abspath(str(gz.OUT)), src[a:b],
          "static const int16_t RP[%d][66] = {%s};" % (len(rp), ",".join("{" + ",".join(map(str, p)) + "}" for p in rp)),
          "static const int16_t BP[%d][66] = {%s};" % (len(bp), ",".join("{" + ",".join(map(str, p)) + "}" for p in bp)),
+         "static const int16_t WP[%d][66] = {%s};" % (len(wp), ",".join("{" + ",".join(map(str, p)) + "}" for p in wp)),
          "static const int32_t W[] = {%s};" % ",".join(map(str, ws)),
          """
 static int check(const pz_bank_t *z, const int16_t (*P)[66], int n)
@@ -49,13 +50,13 @@ static int check(const pz_bank_t *z, const int16_t (*P)[66], int n)
 }
 int main(void)
 {
-    int bad = check(&RH_PZB, RP, %d) + check(&BAR_PZB, BP, %d);
+    int bad = check(&RH_PZB, RP, %d) + check(&BAR_PZB, BP, %d) + check(&WU_PZB, WP, %d);
     int j, p;
     for (p = 0; p < 22; p++) for (j = 0; j < 66; j++) bad += BAR_THUMP[p][j] != BP[p * 40][j];
     printf("bad %%d\\n", bad);
     return bad != 0;
 }
-""" % (len(rp), len(bp))]
+""" % (len(rp), len(bp), len(wp))]
     f = tmp_path / "pz.c"
     f.write_text("\n".join(c))
     exe = tmp_path / "pz"
