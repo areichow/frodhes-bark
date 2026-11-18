@@ -1,7 +1,9 @@
-# Frodhes
+# Frodhes-Bark
 
 **An electric piano, vibraphone and marimba, computed live, for the M-VAVE FM-1, the Ableton Move, the Akai MPC and your
-computer.**
+computer - now with more bark - and a physically modeled Wurlitzer 200A. **
+
+This is a fork of [Frodhes](https://leonardomirabal.github.io/frodhes/) - thank you to the original developers for all of their hard work! 
 
 No samples: every note is calculated as you play it, from how the real instrument works. A hammer strikes a tine
 and a pickup turns its motion into sound; a mallet strikes a bar and its tube rings along. Play softly and it is
