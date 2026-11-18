@@ -51,7 +51,8 @@ CAP_K0 = 72
 # per TYPE (STAGE 77, SUITCASE, FELT, DYNO): the v127 target's offset at and under CAP_K0, dB (0.9.12: SUITCASE -4, its
 # clean, round voicing, pickups further from the tines: the same TARGET for every TYPE cut each to the same H2 and
 # brought SUITCASE within 0.9 dB of STAGE 77's spectrum, hil_scan types)
-TYPE_D = (0.0, -4.0, 0.0, 0.0)
+TOP_POINTS = [[21, -2.5], [40, -3.0], [52, -4.0], [64, -9.0], [72, TARGET]]
+TYPE_D = (0.0, -4.0, -2.5, 1.5)
 G64_DB = 0.3
 CAP_POINTS = [[72, TARGET], [76, -30.0], [84, -31.0], [90, -35.0], [108, -35.0]]
 CAP_VELS = (20, 40, 64, 88, 104, 120, 127)
@@ -146,10 +147,10 @@ def write(R, L, S=None):
 
 
 def cap_db(k, ty=0):
-    """the H2 ceiling for key k (dB re H1, at the voicing's defaults); TARGET (+ the TYPE's TYPE_D) at and under
+    """the H2 ceiling for key k (dB re H1, at the voicing's defaults); TOP_POINTS (+ the TYPE's TYPE_D) at and under
     CAP_K0"""
     if k <= CAP_K0:
-        return TARGET + TYPE_D[ty]
+        return float(np.interp(k, [q[0] for q in TOP_POINTS], [q[1] for q in TOP_POINTS])) + TYPE_D[ty]
     return float(np.interp(k, [q[0] for q in CAP_POINTS], [q[1] for q in CAP_POINTS]))
 
 
@@ -203,7 +204,7 @@ def main():
                     p0, p1 = 10 ** (m0[(ty, 0)][(k, 127)][w] / 10), 10 ** (m1[(ty, 0)][(k, 127)][w] / 10)
                     n2 = max(p0 - p1, 0.0) / (1 - c2)
                     if n2 > 0:
-                        r = max(r, (10 * np.log10(n2) - TARGET - TYPE_D[ty]) / UNIT)
+                        r = max(r, (10 * np.log10(n2) - cap_db(k, ty)) / UNIT)
                 R[ty, j] = min(R_MAX, max(0, int(np.ceil(r))))
         # above CAP_K0: the ceiling at every velocity. The pickup's H2 at each probe velocity is the no-cut build's
         # less what else sits at 2 f0 (L^2, from the two v127 swings above: the same re H1 at any swing)

@@ -107,10 +107,18 @@ def write(code):
         % (" ".join(str(a) for a in ANCH), MATCH_V, tys))
 
 
+def default_ref():
+    try:
+        subprocess.run(["git", "rev-parse", "--verify", "v0.9.9"], cwd=ROOT, check=True, capture_output=True)
+        return "v0.9.9"
+    except Exception:
+        return "48a8cce"
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--write", action="store_true")
-    ap.add_argument("--ref", default="v0.9.9")
+    ap.add_argument("--ref", default=default_ref())
     ap.add_argument("-j", type=int, default=4)
     a = ap.parse_args()
     keys = list(range(KEY_LO, KEY_LO + NKEY))

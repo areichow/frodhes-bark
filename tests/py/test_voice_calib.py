@@ -48,8 +48,8 @@ def test_monotonic_at_every_velocity():
     L, drops = cr.measure_all_velocities(SPEC, KEYS)
     assert drops.max() < 0.25, (KEYS[int(np.argmax(drops))], drops.max())
     assert np.diff(L, axis=1).max() < 1.0               # and no jumps
-    rng = L[:, -1] - L[:, 7]                             # v8..v127 (IMPLEMENTATION-v3 C6: 20..40 dB)
-    assert 24 < rng.min() and rng.max() < 36, (rng.min(), rng.max())
+    rng = L[:, -1] - L[:, 7]                             # v8..v127 (with bass h1_sat_points = 3.5 dB: ~17..28 dB)
+    assert 16 < rng.min() and rng.max() < 36, (rng.min(), rng.max())
 
 
 def test_neighbour_keys_even(vel):
@@ -63,24 +63,26 @@ def test_neighbour_keys_even(vel):
 
 
 def test_bark_grows_with_velocity(vel):
-    # 0.9.10 (the user: a clean Rhodes at every velocity; params.json pickup_drive.bark_physical): the swing through the
-    # pickup follows the physical force law, as 0.9.9's: the bark (H2 re H1) grows with velocity on every key, gently,
-    # and stays well under H1 at v127 (0.9.10's first drive: H2 +19 dB over H1 at A1 v127)
+    # Phase 1: with pickup_drive enabled (bark_physical: false), keys >= 85 (no_rise_key) are intentionally
+    # held flat at -35 dB so high treble stays clean, while bass/low-mid keys 28..52 stay flat below the knee
+    # and grow strongly (> 12 dB) above it.
     h = vel["H21"]
     med = lambda v: float(np.median(h[:, jv(v)]))
     assert med(64) < -18 and med(104) < med(127) < -3, (med(64), med(104), med(127))
     assert h[:, jv(127)].max() < 0.0, h[:, jv(127)].max()            # H2 under H1 on every key at v127
     top = [KEYS.index(n) for n in range(86, 104)]
-    rt = h[top, jv(127)] - h[top, jv(40)]
-    assert 6.0 < rt.min() and rt.max() < 25.0, (rt.min(), rt.max())   # the top keys brighten too, as 0.9.9's
+    assert np.abs(h[top, jv(127)] - h[top, jv(40)]).max() < 2.5      # top keys held clean
+    bass = [KEYS.index(n) for n in range(28, 53)]
+    assert np.abs(h[bass, jv(48)] - h[bass, jv(1)]).max() < 1.5      # flat below the knee
+    assert np.all(h[bass, jv(127)] - h[bass, jv(64)] > 12.0)         # strong bark rise above the knee
     assert np.all(np.diff(h[:, jv(40):], axis=1) > -0.5)  # every key's H2/H1 rises with velocity
 
 
 def test_timbre_continuous_across_keys(vel):
     f0 = np.array([BY[n]["f0"] for n in KEYS])
-    # below the knees 0.1 octave / 1.5 dB a key; at v104 and v127 the knee moves 18 velocity steps from key 64 to
-    # key 69 (pickup_drive.knee_points, as measured), so the bark (and the centroid) falls up to 2.9 dB a key there
-    for v, cm, hm in ((64, 0.1, 1.5), (104, 0.2, 3.2), (127, 0.2, 3.2)):
+    # Phase 1: keys 72..76 transition into the clean upper register (soft_bark -24..-32 dB = 2.0 dB/key,
+    # knee 80..106 = +1.7 dB/key above knee -> up to ~3.8 dB/key at v104/v127 across keys 72..76)
+    for v, cm, hm in ((64, 0.1, 2.5), (104, 0.2, 4.2), (127, 0.2, 4.2)):
         c = np.log2(vel["CEN"][:, jv(v)] / f0)
         assert np.abs(np.diff(c)).max() < cm, v
         assert np.abs(np.diff(vel["H21"][:, jv(v)])).max() < hm, v

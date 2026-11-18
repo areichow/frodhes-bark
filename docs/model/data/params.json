@@ -59,7 +59,28 @@
  },
  "t60_overtones": {
   "_doc": "the T60 the tine's overtones (O1, O2) are scaled from (gen_rhodes.key_physics: this / (f_m / f_1) ^ overtone_damping_exp, x tinebar.tine_t60_frac, each tine's t60 jitter), the same law as t60_v1; 0.9.9's V1 points, so the 0.9.10 longer V1 sustain leaves the overtones' decay as it was (with t60_v1's points the mid keys' O1 rang ~2x longer: its inharmonic partial and the pickup's sidebands 25-33 dB over 0.9.9 at 300 ms around key 57)",
-  "points": [[39, 26.8], [51, 10.3], [63, 10.7], [75, 7.7], [87, 3.1]],
+  "points": [
+   [
+    39,
+    26.8
+   ],
+   [
+    51,
+    10.3
+   ],
+   [
+    63,
+    10.7
+   ],
+   [
+    75,
+    7.7
+   ],
+   [
+    87,
+    3.1
+   ]
+  ],
   "halve_keys": 10.0,
   "floor_s": 0.8
  },
@@ -338,15 +359,15 @@
   "h2_v100_points": [
    [
     21,
-    -20.0
+    -15.5
    ],
    [
-    40,
-    -18.0
+    36,
+    -14.0
    ],
    [
     52,
-    -13.0
+    -12.0
    ],
    [
     72,
@@ -465,15 +486,15 @@
    ],
    [
     57,
-    -22.0
+    -21.0
    ],
    [
     64,
-    -24.0
+    -22.0
    ],
    [
-    69,
-    -27.0
+    72,
+    -24.0
    ],
    [
     76,
@@ -491,7 +512,7 @@
   "knee_points": [
    [
     21,
-    58.0
+    56.0
    ],
    [
     52,
@@ -499,19 +520,19 @@
    ],
    [
     57,
-    64.0
+    62.0
    ],
    [
     64,
-    72.0
+    68.0
    ],
    [
-    69,
-    90.0
+    72,
+    80.0
    ],
    [
     76,
-    108.0
+    106.0
    ],
    [
     84,
@@ -519,7 +540,7 @@
    ]
   ],
   "no_rise_key": 85,
-  "slope_db_per_vel": 0.6,
+  "slope_db_per_vel": 0.26,
   "corner_vel": 10.0,
   "level_smooth_keys": 6.0,
   "noise_ref_dbfs": -26.0,
@@ -528,8 +549,54 @@
   "max_db": 40.0,
   "iterations": 14,
   "dur_s": 0.16,
-  "h1_sat_points": [],
-  "bark_physical": true,
-  "bark_physical_offset_points": [[64, 0.0], [69, -0.5], [84, -0.5], [93, -2.0], [108, -2.0]]
+  "h1_sat_points": [
+   [
+    21,
+    3.5
+   ],
+   [
+    50,
+    3.5
+   ],
+   [
+    57,
+    5.5
+   ],
+   [
+    64,
+    6.5
+   ],
+   [
+    72,
+    11.0
+   ],
+   [
+    76,
+    14.5
+   ]
+  ],
+  "bark_physical": false,
+  "bark_physical_offset_points": [
+   [
+    64,
+    0.0
+   ],
+   [
+    69,
+    -0.5
+   ],
+   [
+    84,
+    -0.5
+   ],
+   [
+    93,
+    -2.0
+   ],
+   [
+    108,
+    -2.0
+   ]
+  ]
  }
 }

@@ -118,9 +118,10 @@ def measure_all_velocities(spec, keys, tol=0.1):
     the largest drop (dB) from one velocity to the next."""
     ks = key_specs(spec, keys)
     vels = list(range(1, 128))
-    specs = [k for k in ks for _ in vels]
-    y = render(specs, spec["pickup"], vels * len(ks), 0.5)
-    L = np.array([rms_db(r[int(0.05 * FS):]) for r in y]).reshape(len(ks), len(vels))
+    L = np.zeros((len(ks), len(vels)))
+    for i, k in enumerate(ks):
+        y = render([k] * len(vels), spec["pickup"], vels, 0.5)
+        L[i] = [rms_db(r[int(0.05 * FS):]) for r in y]
     drops = np.maximum(0.0, -np.diff(L, axis=1).min(axis=1))
     return L, drops
 

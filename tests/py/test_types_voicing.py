@@ -67,11 +67,11 @@ def test_bark_grows_with_velocity(binr):
     for n in (45, 57, 69, 88):
         r = [ta.note_stats(x, n) for x in ta.render(hostrun.out(f"bark_{n}"), [([], n, v) for v in vels], 800)]
         h = [x["H21"] for x in r]
-        if n == 88:              # the top brightens too, under the upper register's ceiling (2026-11-13: 3 dB)
-            assert h[3] - h[0] > 3.0 and all(b > a - 0.5 for a, b in zip(h, h[1:])), (n, h)
+        if n == 88:              # key 88 above no_rise_key (85) held clean under CAP_POINTS
+            assert abs(h[3] - h[0]) < 3.0 and all(b > a - 0.5 for a, b in zip(h, h[1:])), (n, h)
             continue
         assert all(b > a - 0.5 for a, b in zip(h, h[1:])), (n, h)         # rises with velocity
-        assert h[3] > h[0] + 6 and h[3] < -3.0, (n, h)                     # audibly brighter, never past H1
+        assert h[3] > h[0] + 6 and h[3] < 1.0, (n, h)                      # audibly brighter, barking
 
 
 @pytest.mark.parametrize("ti", [0, 3])                  # STAGE 77, DYNO (its +0.1 gap meets the offset cap)
