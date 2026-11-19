@@ -16,7 +16,7 @@ Frodhes is free. If you enjoy it, you can [buy the original developer a coffee](
 <table align="center">
   <tr>
     <td align="center" width="50%"><img src="docs/manual/img/boot.png" width="100%" alt="FRODHES-BARK Boooting"><br>Frodhes-Bark Booting on the M-VAVE FM-1</td>
-    <td align="center" width="50%"><img src="docs/manual/img/velocity.png" width="100%" alt="Frodhes-Bark on the FM-1: Velocity Page"><br><b>Frodhes-Bark's new Velocity</td>
+    <td align="center" width="50%"><img src="docs/manual/img/velocity.png" width="100%" alt="Frodhes-Bark on the FM-1: Velocity Page"><br><b>Frodhes-Bark's new Velocity Curve Page</td>
   </tr>
 </table>
 
