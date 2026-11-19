@@ -43,6 +43,7 @@
 200 turn 0 1
 205 turn 0 1
 207 turn 0 1
+209 turn 0 1
 300 expect state page REVERB
 300 expect state label0 TYPE
 300 expect state label1 MIX

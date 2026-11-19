@@ -217,19 +217,117 @@ typedef struct {
                                                 * rh_touch_mode): 0 = A (every record before) */
     uint8_t sus_leds;                          /* 0.9.10: SUSTAIN LEDS, a key the sustain rings on under LEDS ALL /
                                                 * SCALE: 0 DARK (every record before), 1 LIT (frodhes.c key LEDs) */
-    uint8_t reserved[16];
+    uint8_t vc_x[6], vc_y[6];                  /* 1958: 6-point velocity curve (all-zero = default LINEAR) */
+    uint8_t reserved[4];
 #else
     uint8_t play_off;                          /* 0.9.9: DISPLAY PLAY LED: 0 BEAT (every record before), 1 OFF */
     uint8_t vel_resp;                          /* 0.9.10: MIDI RESPONSE, the velocity response (N_VRESP; rhodes.c
                                                 * rh_touch_mode): 0 = A (every record before) */
     uint8_t sus_leds;                          /* 0.9.10: SUSTAIN LEDS, a key the sustain rings on under LEDS ALL /
                                                 * SCALE: 0 DARK (every record before), 1 LIT (frodhes.c key LEDs) */
-    uint8_t reserved[18];
+    uint8_t vc_x[6], vc_y[6];                  /* 1958: 6-point velocity curve (all-zero = default LINEAR) */
+    uint8_t reserved[6];
 #endif
 } settings_t;
 _Static_assert(sizeof(settings_t) == 256, "settings record is 256 B");
 
 static settings_t set;
+
+/* ---- 6-point Pianoteq-style velocity curve (1958) + live NoteOn/NoteOff indicator tracker */
+#define VC_NPTS 6u
+#define VC_NPRESET 5u
+#define VC_SLOTS 16u
+#define VC_FADE_MS 600u
+static const uint8_t VC_PRESETS[VC_NPRESET][2][VC_NPTS] = {
+    {{0, 25, 51, 76, 102, 127}, {0, 25, 51, 76, 102, 127}},   /* 0: LIN  (exact 1:1 flat diagonal) */
+    {{0, 30, 60, 88, 108, 122}, {0, 14, 32, 56,  92, 127}},   /* 1: BARK (concave warm->bark) */
+    {{0, 28, 56, 84, 108, 127}, {0, 16, 36, 62,  94, 127}},   /* 2: HVY  (heavy / firm touch) */
+    {{0, 20, 44, 72,  98, 118}, {0, 34, 64, 92, 114, 127}},   /* 3: LGT  (convex light touch) */
+    {{0, 25, 51, 76, 102, 127}, {0, 22, 42, 62,  80,  96}},   /* 4: SOFT (mellow dynamic cap) */
+};
+static const char *const N_VC_PRESET[VC_NPRESET + 1u] = {"LIN", "BARK", "HVY", "LGT", "SOFT", "CUST"};
+static struct { uint8_t note, vel_in, state; uint32_t t_rel; } vc_notes[VC_SLOTS];
+static uint8_t vc_dirty;
+
+FR_COLD static void vcurve_load_preset(uint32_t idx)
+{
+    uint32_t i;
+    if (idx >= VC_NPRESET) idx = 0u;
+    for (i = 0; i < VC_NPTS; i++) { set.vc_x[i] = VC_PRESETS[idx][0][i]; set.vc_y[i] = VC_PRESETS[idx][1][i]; }
+}
+FR_COLD static uint32_t vcurve_preset_idx(void)
+{
+    uint32_t p, i;
+    for (p = 0; p < VC_NPRESET; p++) {
+        uint32_t ok = 1u;
+        for (i = 0; i < VC_NPTS; i++)
+            if (set.vc_x[i] != VC_PRESETS[p][0][i] || set.vc_y[i] != VC_PRESETS[p][1][i]) { ok = 0u; break; }
+        if (ok) return p;
+    }
+    return VC_NPRESET;
+}
+FR_COLD static uint32_t vcurve_eval_raw(uint32_t vel)
+{
+    int32_t out;
+    uint32_t i;
+    if (vel <= set.vc_x[0]) return set.vc_y[0];
+    if (vel >= set.vc_x[VC_NPTS - 1u]) return set.vc_y[VC_NPTS - 1u];
+    for (i = 0; i < VC_NPTS - 1u; i++) {
+        if (vel <= set.vc_x[i + 1u]) {
+            int32_t x0 = set.vc_x[i], x1 = set.vc_x[i + 1u], dx = x1 - x0;
+            int32_t y0 = set.vc_y[i], y1 = set.vc_y[i + 1u], dy = y1 - y0;
+            if (dx <= 0) { out = y1; }
+            else {
+                int32_t num = dy * ((int32_t)vel - x0);
+                out = y0 + (num >= 0 ? (num + dx / 2) / dx : -((-num + dx / 2) / dx));
+            }
+            return (uint32_t)(out < 0 ? 0 : out > 127 ? 127 : out);
+        }
+    }
+    return set.vc_y[VC_NPTS - 1u];
+}
+FR_COLD static uint32_t vcurve_map(uint32_t vel)
+{
+    uint32_t out;
+    if (vel == 0u) return 0u;
+    out = vcurve_eval_raw(vel);
+    return out < 1u ? 1u : out > 127u ? 127u : out;
+}
+FR_COLD static void vcurve_note_on(uint32_t note, uint32_t vel_in)
+{
+    uint32_t i, slot = VC_SLOTS, fade_slot = VC_SLOTS;
+    for (i = 0; i < VC_SLOTS; i++) {
+        if (vc_notes[i].state && vc_notes[i].note == (uint8_t)note) { slot = i; break; }
+        if (!vc_notes[i].state && slot == VC_SLOTS) slot = i;
+        if (vc_notes[i].state == 2u && fade_slot == VC_SLOTS) fade_slot = i;
+    }
+    if (slot == VC_SLOTS) slot = fade_slot < VC_SLOTS ? fade_slot : 0u;
+    vc_notes[slot].note = (uint8_t)note;
+    vc_notes[slot].vel_in = (uint8_t)(vel_in > 127u ? 127u : vel_in);
+    vc_notes[slot].state = 1u;
+    vc_notes[slot].t_rel = fm1_ms;
+    vc_dirty = 1u;
+}
+FR_COLD static void vcurve_note_off(uint32_t note)
+{
+    uint32_t i;
+    for (i = 0; i < VC_SLOTS; i++)
+        if (vc_notes[i].state == 1u && vc_notes[i].note == (uint8_t)note) {
+            vc_notes[i].state = 2u;
+            vc_notes[i].t_rel = fm1_ms;
+            vc_dirty = 1u;
+        }
+}
+FR_COLD static void vcurve_all_off(void)
+{
+    uint32_t i;
+    for (i = 0; i < VC_SLOTS; i++)
+        if (vc_notes[i].state == 1u) {
+            vc_notes[i].state = 2u;
+            vc_notes[i].t_rel = fm1_ms;
+            vc_dirty = 1u;
+        }
+}
 /* the velocity response (MIDI page RESPONSE; CC 40, frodhes.c midi_cc): how a strike's velocity becomes the electric
  * piano's sound (rhodes.c rh_touch_mode, read at each note-on: a change takes effect at the next strike). 0 = A (the
  * pickup excursion follows the velocity; every record before it), 1 = B (the piecewise velocity map), 2 = C (both,
@@ -353,6 +451,7 @@ FR_COLD static void params_defaults(void)
     set.color = 1;                 /* AMBER */
     set.last_on[0] = set.last_on[1] = set.last_on[2] = 1;
     set.sc_scale = 0;
+    vcurve_load_preset(0u);
     for (i = 0; i < P_COUNT; i++) PV(i) = PARAMS[i].def;
 }
 
@@ -370,6 +469,7 @@ FR_COLD static void params_sanitize(void)
         set.play_off = 0;
         set.vel_resp = 0;
         set.sus_leds = 0;
+        vcurve_load_preset(0u);
         set.flags2 = 0;
         for (i = 0; i < 4u; i++) set.perf[i] = 0;
         params_split_phaser(p, P_SLOTS);
@@ -437,6 +537,15 @@ FR_COLD static void params_sanitize(void)
     if (set.vel_curve > 3u) set.vel_curve = 0;              /* TOUCH (keyvel.h): 0 = MEDIUM */
     if (set.vel_resp >= VRESP_N) set.vel_resp = 0;          /* RESPONSE: 0 = A */
     if (set.sus_leds > 1u) set.sus_leds = 0;                /* SUSTAIN LEDS: 0 = DARK */
+    if (set.vc_x[VC_NPTS - 1u] == 0u && set.vc_y[VC_NPTS - 1u] == 0u) {
+        vcurve_load_preset(0u);
+    } else {
+        for (i = 0; i < VC_NPTS; i++) {
+            if (set.vc_x[i] > 127u) set.vc_x[i] = 127u;
+            if (i > 0u && set.vc_x[i] < set.vc_x[i - 1u]) set.vc_x[i] = set.vc_x[i - 1u];
+            if (set.vc_y[i] > 127u) set.vc_y[i] = 127u;
+        }
+    }
     if (set.tune < -50 || set.tune > 50) set.tune = 0;
     if (set.focus > 2) set.focus = 0;
     if (set.sc_mode > 2) set.sc_mode = 0;

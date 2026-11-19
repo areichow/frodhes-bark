@@ -13,6 +13,7 @@
 82 turn 0 1
 90 turn 0 1
 92 turn 0 1
+94 turn 0 1
 200 turn 2 1
 400 keys 0x40
 460 keys 0

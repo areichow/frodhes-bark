@@ -26,7 +26,7 @@
 20 midi 0xB0 68 64
 20 midi 0xB0 110 52
 100 turn 0 1
-300 expect state page FRODHES
+300 expect state page FRODHES-BARK
 300 expect state label.2.1 TONE
 300 expect state label.2.2 BELL
 # ---- VIBES (CC 79): MALLET, MOTOR (on by itself)

@@ -5,7 +5,7 @@
 # settings for the auto save. CC 40 sets it in VRESP_N bands (two: 0-63 A, 64-127 B). The save, the power cycle and
 # the older records: tests/py/test_vel_resp.py. A velocity is never rewritten: tests/py/test_vel_layers.py.
 100 btn 8
-150 expect state page FRODHES
+150 expect state page FRODHES-BARK
 200 turn 0 1
 250 turn 0 1
 300 turn 0 1

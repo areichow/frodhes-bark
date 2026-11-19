@@ -45,9 +45,10 @@ LAYER_V = [8, 24, 40, 56, 72, 88, 104, 120]
 PLEN = 64
 V_ANCH = [1, 8, 24, 40, 56, 72, 88, 104, 120, 127]
 NANCH = len(V_ANCH)
-PU_N = 512
-S_MAX_GAP2 = 8.0
-WU_U_MAX = 94890000        # Q25: 2.82794 gaps -> s = 7.9973 < 8.0 -> i in [0, 511]
+PU_N = 256
+S_MAX_GAP2 = 4.0
+WU_U_MAX = 67108863        # Q25: < 2.0 -> s_scaled = u^2 < 4.0 -> i in [0, 255]
+Z_SCALE = 1.0 / math.sqrt(2.0)  # scale physical z by 1/sqrt(2) so [0, 8) gap^2 maps to [0, 4) in 256 cells
 WU_KAP_HI = 69             # keys 21..68 (48 keys)
 ROM_LO, ROM_HI = 0xFFC00000, 0xFFCFFFFF
 PHI_BIAS = 1 << 28
@@ -160,8 +161,8 @@ def comb_dc_ds(s):
 def comb_pickup_table():
     ds = S_MAX_GAP2 / PU_N
     s = np.arange(PU_N + 1) * ds
-    phi = comb_c(np.sqrt(s))
-    dds = comb_dc_ds(s) * ds
+    phi = comb_c(np.sqrt(2.0 * s))
+    dds = 2.0 * comb_dc_ds(2.0 * s) * ds
     A = float(max(np.max(np.abs(phi)), np.max(np.abs(dds))))
     P = [PHI_BIAS - int(round(x * Q28 / A)) for x in phi]
     M = [-int(round(x * Q28 / A)) for x in dds]
@@ -601,21 +602,21 @@ def emit_header(spec, phim):
         all_i32.append(v)
         return v
 
-    # WU_KEYS[88]
+    # WU_KEYS[88] (z-domain fields b, o1.b, off, kill scaled by Z_SCALE = 1/sqrt(2) to match 256-knot WU_PHIM)
     w("static const wu_key_t WU_KEYS[WU_NKEY] = {")
     for k in spec["keys"]:
         c0 = rc.mode_coefs(k["v1"]["f"], k["v1"]["t60"], k["v1"]["t60_rel"])
-        b0 = chk(int(round(k["v1"]["b"] * Q30)))
+        b0 = chk(int(round(k["v1"]["b"] * Z_SCALE * Q30)))
         d0, dr0 = chk(c0["d"]), chk(c0["drel"])
         c1 = rc.mode_coefs(k["o1"]["f"], k["o1"]["t60"], k["o1"]["t60_rel"])
-        b1 = chk(int(round(k["o1"]["b"] * Q30))) if c1["th"] else 0
+        b1 = chk(int(round(k["o1"]["b"] * Z_SCALE * Q30))) if c1["th"] else 0
         o1_s = "{%d,%d,%d,%d,%d,%d,%d}" % (
             chk(c1["sh"]), chk(c1["ch"]), chk(c1["th"]),
             chk(c1["d"]), chk(c1["drel"]), chk(c1["cr"]), b1,
         )
-        off_q = chk(int(round(k["off"] * Q25)))
+        off_q = chk(int(round(k["off"] * Z_SCALE * Q25)))
         gain_q = chk(int(round(k["gain"] * Q16)))
-        kill_q = chk(int(round(k["kill"] * Q25)))
+        kill_q = chk(int(round(k["kill"] * Z_SCALE * Q25)))
         w(f"    {{{d0}, {dr0}, {b0}, {o1_s}, {off_q}, {gain_q}, {kill_q}, {k['life_blocks']}, {k['band']}, 0}},")
     w("};")
     w("")
@@ -658,7 +659,7 @@ def emit_header(spec, phim):
         w("    {" + ",".join(map(str, bd["plev"])) + "},")
     w("};")
     w("static const uint16_t WU_KAP[WU_KAP_HI - WU_KEY_LO] = {")
-    kap = spec["kap"]
+    kap = [min(65535, int(v * 2)) for v in spec["kap"]]
     for i in range(0, len(kap), 16):
         w("    " + ",".join(str(v) for v in kap[i:i + 16]) + ",")
     w("};")
@@ -678,7 +679,7 @@ def emit_header(spec, phim):
     w("};")
     w("static const rh_type_t WU_TYPE[2] = {")
     for ty in spec["types"]:
-        off_q = chk(int(round(ty["off"] * Q25)))
+        off_q = chk(int(round(ty["off"] * Z_SCALE * Q25)))
         bark_q = chk(int(round(ty["bark"] * Q16)))
         bark_g = chk(int(round(Q16 * 10 ** (ty["level_db"] / 20.0) / ty["bark"])))
         bell_q = chk(int(round(ty["bell"] * Q16)))

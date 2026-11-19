@@ -6,7 +6,7 @@
 # without a reading plays KEY VEL (the velocities from readings: tests/scripts/keyvel.txt). Neither changes a MIDI
 # note's velocity (tests/py/test_vel_layers.py).
 100 btn 8
-150 expect state page FRODHES
+150 expect state page FRODHES-BARK
 160 turn 0 1
 170 turn 0 1
 180 turn 0 1

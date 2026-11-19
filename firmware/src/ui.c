@@ -30,8 +30,8 @@ static void tempo_set10(uint32_t b);
  * engines' pages came from their tables (eng_pages.h): VOICE 1/n .. n/n, one PG_VOICE page with its number ui_vp */
 enum { PG_PERF, PG_ASSIGN, PG_PIANO, PG_VOICE, PG_RETIRED4, PG_COMP, PG_FILTER, PG_TREM, PG_PHA, PG_CHO, PG_DELAY,
        PG_TEMPO, PG_SCALE, PG_CHORD, PG_SEQ, PG_ARP, PG_LFO, PG_SETUP, PG_MIDI, PG_DRIVE, PG_REVERB, PG_DISPLAY,
-       PG_REVERB2, PG_EQ, PG_SEQ2, PG_DISPLAY2, PG_N };                       /* REVERB 2 (0.9.5): PRE-DELAY, SIZE, MOD, LOW CUT; EQ: before
-                                                         * the drive (fx_eq.c) */
+       PG_REVERB2, PG_EQ, PG_SEQ2, PG_DISPLAY2, PG_VCURVE, PG_N };             /* REVERB 2 (0.9.5): PRE-DELAY, SIZE, MOD, LOW CUT; EQ: before
+                                                         * the drive (fx_eq.c); VCURVE (1958): 6-point velocity curve */
 enum { E_HEADER = 0, E_TITLE = 1, E_CARD0 = 2, E_FOOTER = 6, E_METER = 7, E_ROLL = 8, E_N = 9, E_CARDS = 10 };   /* E_CARDS: all four;
                                     * E_METER: COMP's meter / SEQUENCER's cells, E_ROLL: SEQUENCER's NOW / NEXT */
 /* card slots: a parameter id (< P_COUNT) or one of these (not stored: set.focus is a column, set.perf a PERF_T index;
@@ -39,7 +39,7 @@ enum { E_HEADER = 0, E_TITLE = 1, E_CARD0 = 2, E_FOOTER = 6, E_METER = 7, E_ROLL
 enum { S_KVEL = 80, S_TUNE, S_BPM, S_CLOCK, S_SCMODE, S_SCALE, S_ROOT, S_TRANS, S_TWKIND, S_PERF0, S_ASG0 = S_PERF0 + 4,
        S_ARPMODE = S_ASG0 + 4, S_ARPRATE, S_ARPOCT, S_ARPGATE, S_USBVOL, S_CHTYPE, S_CHINV, S_CHVOICE, S_CHSTRUM,
        S_SQBARS, S_SQQUANT, S_SQSWING, S_SQEDIT, S_MCH, S_TRS, S_COLOR, S_BRIGHT, S_LEDS, S_TOUCH, S_PLED,
-       S_SQSTEP, S_SQCHANCE, S_VRESP, S_SUSLED, S_VERSION, S_NONE = 0xFF };
+       S_SQSTEP, S_SQCHANCE, S_VRESP, S_SUSLED, S_VERSION, S_VCPT, S_VCIN, S_VCOUT, S_VCCRV, S_NONE = 0xFF };
 #ifndef FM1_NENC                                       /* the HAL's encoders and buttons (the FM-1: 7, 14; the SMK-37:
                                                          * 8, 18); the host and the emulator stand in for the FM-1 */
 #define FM1_NENC 7u
@@ -125,8 +125,8 @@ static int32_t sq_step_chance(void);
 static void sq_step_chance_set(int32_t d);
 /* the SELECT order (0.9.3, user: the instrument pages next to each other right after PERFORM; ASSIGN, rarely used,
  * next to SETUP); VOICE stands for all the engine's VOICE pages */
-#define PG_NORD 25u
-static const uint8_t PG_ORDER[PG_NORD] = {PG_PERF, PG_PIANO, PG_VOICE, PG_COMP, PG_EQ, PG_DRIVE, PG_FILTER, PG_TREM, PG_PHA,
+#define PG_NORD 26u
+static const uint8_t PG_ORDER[PG_NORD] = {PG_PERF, PG_PIANO, PG_VOICE, PG_VCURVE, PG_COMP, PG_EQ, PG_DRIVE, PG_FILTER, PG_TREM, PG_PHA,
                                           PG_CHO, PG_DELAY, PG_REVERB, PG_REVERB2, PG_TEMPO, PG_SCALE, PG_CHORD, PG_ARP,
                                           PG_LFO, PG_SEQ, PG_SEQ2, PG_ASSIGN, PG_SETUP, PG_MIDI, PG_DISPLAY, PG_DISPLAY2};   /* (DISPLAY 2 last: the SMK-37 stops before it, PG_WALK) DRIVE before FILTER
                                     * (0.9.5, the user), REVERB the last effect, as in the chain, its second page right
@@ -162,10 +162,10 @@ FR_COLD static uint32_t pg_at(uint32_t k, uint32_t *vp)         /* the k-th page
     *vp = 0;
     return PG_PERF;
 }
-static const char *const PAGE_TITLE[PG_N] = {"PERFORM", "ASSIGN", "FRODHES", "VOICE", "", "COMPRESSOR", "FILTER", "TREM/WAH",
+static const char *const PAGE_TITLE[PG_N] = {"PERFORM", "ASSIGN", "FRODHES-BARK", "VOICE", "", "COMPRESSOR", "FILTER", "TREM/WAH",
                                              "PHASER", "CHORUS", "DELAY", "TEMPO", "SCALE", "CHORD", "SEQUENCER",
                                              "ARPEGGIO", "LFO", "SETUP", "MIDI", "DRIVE", "REVERB", "DISPLAY",
-                                             "REVERB 2", "EQ", "SEQUENCER 2", "DISPLAY 2"};
+                                             "REVERB 2", "EQ", "SEQUENCER 2", "DISPLAY 2", "VELOCITY"};
 static const uint8_t PAGE_S[PG_N][4] = {                /* VOICE and FRODHES K2 / K3: the engine's (slot_at) */
     {S_PERF0, S_PERF0 + 1, S_PERF0 + 2, S_PERF0 + 3},
     {S_ASG0, S_ASG0 + 1, S_ASG0 + 2, S_ASG0 + 3},
@@ -193,6 +193,7 @@ static const uint8_t PAGE_S[PG_N][4] = {                /* VOICE and FRODHES K2 
     {P_EQ_LO, P_EQ_MID, P_EQ_FREQ, P_EQ_HI},            /* EQ: before the drive */
     {S_SQSTEP, S_SQCHANCE, S_NONE, S_NONE},             /* SEQUENCER 2: a step's CHANCE (0.9.9) */
     {UI_SUSLED, S_NONE, S_NONE, S_NONE},                /* DISPLAY 2: SUSTAIN LEDS (issue #35) */
+    {S_VCPT, S_VCIN, S_VCOUT, S_VCCRV},                 /* VELOCITY: 6-point velocity curve (1958) */
 };
 static const char *const PAGE_LAB[PG_N][4] = {
     {"", "", "", ""},                                   /* PERFORM: the assigned parameter's name (slot_label) */
@@ -221,6 +222,7 @@ static const char *const PAGE_LAB[PG_N][4] = {
     {"LOW", "MID", "MID FREQ", "HIGH"},
     {"STEP", "CHANCE", "", ""},
     {UI_SUSLED_LAB, "", "", ""},
+    {"POINT", "IN", "OUT", "CURVE"},
 };
 static const char *const PAGE_HINT[PG_N] = {"THE KNOBS: SET ON ASSIGN", "WHAT EACH PERFORM KNOB PLAYS",
                                             "FX: ALL EFFECTS ON / OFF", "", "",
@@ -230,7 +232,8 @@ static const char *const PAGE_HINT[PG_N] = {"THE KNOBS: SET ON ASSIGN", "WHAT EA
                                             "USB AND TRS: THE SAME CHANNEL", "K1: THE DRIVE TYPE", "NEXT PAGE: SIZE, MOD, LOW CUT",
                                             "THE SCREEN AND THE KEY LIGHTS", "SIZE AUTO: MIX SETS THE SIZE",
                                             "BEFORE THE DRIVE  0 DB: FLAT", "HOW OFTEN THE STEP'S NOTES PLAY",
-                                            "KEY LIGHTS UNDER THE SUSTAIN"};
+                                            "KEY LIGHTS UNDER THE SUSTAIN",
+                                            "K1: PT  K2: IN  K3: OUT  K4: CURVE/LIN"};
 /* the reverb's TYPE card (P_RV_TYPE, as the drive's: 0 OFF, then the types; params.c N_RV / N_RV_LONG) */
 #define RV_INF 3u                                       /* INFINITE: DECAY 120..126 SUSTAIN (the tail holds, the input
                                                          * open), 127 FREEZE (the input closed): rev_ctl_t.freeze */
@@ -630,6 +633,9 @@ FR_COLD static uint32_t tw_kind(void)                          /* OFF PAN TREM W
     uint32_t sw = PV(P_TW_SW), m = PV(P_TW_MODE);
     return sw == 2u ? 3u : sw != 1u ? 0u : m ? 2u : 1u;
 }
+static uint8_t vc_sel;                                  /* VELOCITY page: selected point 0..5 (not stored) */
+static const char *const VC_DYN[8] = {"ppp", "pp", "p", "mp", "mf", "f", "ff", "fff"};
+static const char *const VC_DYN_CARD[8] = {"PPP", "PP", "P", "MP", "MF", "F", "FF", "FFF"};
 FR_COLD static void color_text(char *v, uint32_t i) { p_strcpy(v, COLOR_NAME[i < COLOR_N ? i : 0u], 6); }
 FR_COLD static int32_t slot_val(uint32_t s, int32_t *hi)
 {
@@ -660,6 +666,10 @@ FR_COLD static int32_t slot_val(uint32_t s, int32_t *hi)
     case S_SUSLED: *hi = 1; return set.sus_leds;
     case S_VRESP: *hi = VRESP_N - 1; return set.vel_resp;
     case S_VERSION: *hi = 0; return 0;
+    case S_VCPT: *hi = (int32_t)VC_NPTS - 1; return vc_sel;
+    case S_VCIN: *hi = 127; return set.vc_x[vc_sel];
+    case S_VCOUT: *hi = 127; return set.vc_y[vc_sel];
+    case S_VCCRV: *hi = (int32_t)VC_NPRESET; return (int32_t)vcurve_preset_idx();
     case S_CHTYPE: *hi = CH_NTYPE - 1; return CH_TYPE;
     case S_CHINV: *hi = 3; return CH_INV;
     case S_CHVOICE: *hi = 2; return CH_VOICE;
@@ -677,7 +687,7 @@ FR_COLD static int slot_is_level(uint32_t s)                    /* a gauge only 
 {
     if (s < P_COUNT) return PARAMS[s].fmt != F_ENUM && PARAMS[s].fmt != F_DIV;
     return s == S_KVEL || s == S_TUNE || s == S_BPM || s == S_TRANS || s == S_ARPGATE || s == S_CHSTRUM
-        || s == S_SQSTEP;                               /* (STEP: the cursor's place in the loop, up to 256 steps) */
+        || s == S_SQSTEP || s == S_VCIN || s == S_VCOUT; /* (STEP: the cursor's place in the loop, up to 256 steps) */
 }
 FR_COLD static void fmt_signed(char *s, int32_t v) { if (v > 0) { s[0] = '+'; p_fmt_int(s + 1, v); } else p_fmt_int(s, v); }
 /* a rate / time knob that is synced to the tempo: its SYNC parameter (the knob shows and steps the note value), else 0 */
@@ -752,6 +762,16 @@ FR_COLD static void slot_text(uint32_t s, char *v)
     case S_SUSLED: p_strcpy(v, set.sus_leds ? "LIT" : "DARK", 4); return;
     case S_VRESP: p_strcpy(v, N_VRESP[set.vel_resp < VRESP_N ? set.vel_resp : 0u], 6); return;
     case S_VERSION: p_strcpy(v, ui_version_long(), 12); return;
+    case S_VCPT: v[0] = 'P'; v[1] = (char)('1' + vc_sel); v[2] = 0; return;
+    case S_VCIN: p_fmt_int(v, set.vc_x[vc_sel]); return;
+    case S_VCOUT: {
+        uint32_t y = set.vc_y[vc_sel], n = 0;
+        p_strcpy(v, VC_DYN_CARD[(y >> 4) & 7u], 4);
+        while (v[n]) n++;
+        v[n++] = ' '; p_fmt_int(v + n, (int32_t)y);
+        return;
+    }
+    case S_VCCRV: p_strcpy(v, N_VC_PRESET[vcurve_preset_idx()], 6); return;
     case S_CHTYPE: p_strcpy(v, CH_TYPE_NAME[CH_TYPE], 9); return;
     case S_CHINV: p_strcpy(v, CH_INV_NAME[CH_INV], 4); return;
     case S_CHVOICE: p_strcpy(v, CH_VOICE_NAME[CH_VOICE], 5); return;
@@ -863,7 +883,38 @@ FR_COLD static void slot_turn(uint32_t s, int32_t d)
     case S_LEDS: set.leds = LEDS_STORED[clampi((int32_t)leds_disp() + sgn(d), 0, (int32_t)LEDS_N - 1)]; break;
     case S_PLED: set.play_off = d < 0; break;
     case S_SUSLED: set.sus_leds = d > 0; break;
-    case S_VRESP: vresp_set((uint32_t)clampi((int32_t)set.vel_resp + sgn(d), 0, VRESP_N - 1)); break;   /* (next strike) */          /* PLAY's beat light: BEAT / OFF (the dark, issue #29) */
+    case S_VRESP: vresp_set((uint32_t)clampi((int32_t)set.vel_resp + sgn(d), 0, VRESP_N - 1)); break;   /* (next strike) */
+    case S_VCPT:
+        vc_sel = (uint8_t)clampi((int32_t)vc_sel + sgn(d), 0, (int32_t)VC_NPTS - 1);
+        ui_mark(E_CARDS); ui_mark(E_METER);
+        break;
+    case S_VCIN: {
+        int32_t lo = vc_sel > 0u ? (int32_t)set.vc_x[vc_sel - 1u] : 0;
+        int32_t hi = vc_sel + 1u < VC_NPTS ? (int32_t)set.vc_x[vc_sel + 1u] : 127;
+        set.vc_x[vc_sel] = (uint8_t)clampi((int32_t)set.vc_x[vc_sel] + d, lo, hi);
+        set_dirty = 1; set_t_change = fm1_ms;
+        ui_mark(E_CARD0 + 3); ui_mark(E_METER);
+        break;
+    }
+    case S_VCOUT:
+        set.vc_y[vc_sel] = (uint8_t)clampi((int32_t)set.vc_y[vc_sel] + d, 0, 127);
+        set_dirty = 1; set_t_change = fm1_ms;
+        ui_mark(E_CARD0 + 3); ui_mark(E_METER);
+        break;
+    case S_VCCRV: {
+        uint32_t cur = vcurve_preset_idx(), nxt;
+        if (cur == VC_NPRESET) {
+            nxt = d < 0 ? 0u : 1u;
+            vcurve_load_preset(nxt);
+            if (nxt == 0u) ui_say("CURVE: LINEAR");
+        } else {
+            nxt = (uint32_t)clampi((int32_t)cur + sgn(d), 0, (int32_t)VC_NPRESET - 1);
+            vcurve_load_preset(nxt);
+        }
+        set_dirty = 1; set_t_change = fm1_ms;
+        ui_mark(E_CARDS); ui_mark(E_METER);
+        break;
+    }
     case S_TOUCH:                                       /* how the keys' velocity follows the press (keyvel.c) */
         kv_touch_store((uint32_t)clampi((int32_t)kv_touch() + sgn(d), 0, KV_NTOUCH - 1));
         kv_apply();
@@ -978,7 +1029,7 @@ FR_COLD static void draw_header(void)
     int32_t x;
     uint32_t n = 0;
     cv_begin(240, HD_H, FC_BG);
-    if (set.preset < PR_NALL_UI) preset_name(set.preset, nm); else p_strcpy(nm, "FRODHES", 8);
+    if (set.preset < PR_NALL_UI) preset_name(set.preset, nm); else p_strcpy(nm, "FRODHES-BARK", 13);
     nm[16] = 0;
     slot_text(S_BPM, b);
     batt_icon(230 - 17, 6, FC_LAB, FC_VAL, FC_BG);
@@ -1390,7 +1441,7 @@ FR_COLD static uint32_t ui_fit_scan(void)
             if (pass) { PV(P_CMP_SW) = 1; PV(P_DRV_SW) = 1; PV(P_TW_SW) = 2; PV(P_RV_TYPE) = RV_INF; }
             for (pg = 0; pg < PG_N; pg++)
                 for (vp = 0, nv = pg == PG_VOICE ? vp_count() : 1u; vp < nv; vp++) {
-                    if (pg == PG_SEQ || !PAGE_TITLE[pg][0]) continue;
+                    if (pg == PG_SEQ || pg == PG_VCURVE || !PAGE_TITLE[pg][0]) continue;
                     ui_page = (uint8_t)pg; ui_vp = (uint8_t)vp;
                     for (k = 0; k < 4u; k++) {
                         uint32_t s = slot_at_v(pg, vp, k), y = 0;
@@ -1590,19 +1641,148 @@ FR_COLD static void draw_strip(void)                            /* the bar playi
     }
     cv_blit(0, SQ_STRIP_Y);
 }
-FR_COLD static void draw_card_small(uint32_t k)                 /* the SEQUENCER's four: the name, the value, a hairline */
+FR_COLD static void draw_card_small(uint32_t k)                 /* SEQUENCER / VELOCITY four compact cards */
 {
-    uint32_t s = PAGE_S[PG_SEQ][k];
+    uint32_t s = PAGE_S[ui_page][k];
     int hot = ui_hot_card == k && ui_hot_t && fm1_ms - ui_hot_t < HOT_MS;
     uint16_t c = s == S_SQEDIT && sq_erase ? UI_ACC : FC_VAL;
     char v[16];
     cv_begin(58, SQ_CARD_H, FC_BG);
     slot_text(s, v);
-    aa_text_c(0, S_TOP(7), 58, &AF_S, PAGE_LAB[PG_SEQ][k], hot ? UI_ACC : FC_LAB, FC_BG);
+    aa_text_c(0, S_TOP(7), 58, &AF_S, PAGE_LAB[ui_page][k], hot ? UI_ACC : FC_LAB, FC_BG);
     if (big_ok(v, 56)) aa_text_c(0, L_TOP(24), 58, &AF_L, v, c, FC_BG);
     else aa_text_c(0, S_TOP(24), 58, &AF_S, v, c, FC_BG);
     cv_rect(4, SQ_CARD_H - 1, 50, 1, hot ? UI_ACC : mt.seq);
     cv_blit(1u + k * 60u, SQ_CARD_Y);
+}
+
+/* ---- VELOCITY page graph (240 x 124 at y = 42..165, rendered in two 240 x 62 strips via cv_oy) */
+static const uint8_t VC_G3[13][5] = {                           /* 3x5 glyphs: '0'..'9', 'p', 'f', 'm' (5-wide) */
+    {7, 5, 5, 5, 7}, {2, 6, 2, 2, 7}, {7, 1, 7, 4, 7}, {7, 1, 7, 1, 7}, {5, 5, 7, 1, 1},
+    {7, 4, 7, 1, 7}, {7, 4, 7, 5, 7}, {7, 1, 2, 2, 2}, {7, 5, 7, 5, 7}, {7, 5, 7, 1, 7},
+    {0, 6, 5, 6, 4},                                            /* 10: 'p' */
+    {3, 4, 7, 4, 4},                                            /* 11: 'f' */
+    {0, 27, 21, 21, 21},                                        /* 12: 'm' (5 px wide) */
+};
+FR_COLD static int32_t vc_gidx(char ch, int32_t *w)
+{
+    if (ch >= '0' && ch <= '9') { *w = 3; return ch - '0'; }
+    if (ch == 'p') { *w = 3; return 10; }
+    if (ch == 'f') { *w = 3; return 11; }
+    if (ch == 'm') { *w = 5; return 12; }
+    *w = 2; return -1;
+}
+FR_COLD static int32_t vc_txt_w(const char *s)
+{
+    int32_t w = 0, gw;
+    for (; *s; s++) { vc_gidx(*s, &gw); w += gw + (s[1] ? 1 : 0); }
+    return w;
+}
+FR_COLD static void vc_txt(int32_t x, int32_t y, const char *s, uint16_t c)
+{
+    int32_t gw, r, b;
+    for (; *s; s++) {
+        int32_t gi = vc_gidx(*s, &gw);
+        if (gi >= 0)
+            for (r = 0; r < 5; r++)
+                for (b = 0; b < gw; b++)
+                    if ((VC_G3[gi][r] >> (gw - 1 - b)) & 1u) cv_pset(x + b, y + r, c);
+        x += gw + 1;
+    }
+}
+FR_COLD static void draw_vcurve(void)
+{
+    static const uint8_t XT[6] = {0, 25, 50, 75, 100, 127};
+    static const char *const XL[6] = {"0", "25", "50", "75", "100", "127"};
+    const int32_t x0 = 30, x1 = 231, y0 = 6, y1 = 107;
+    uint32_t strip, i, px;
+    for (strip = 0; strip < 2u; strip++) {
+        cv_begin(240, 62, FC_BG);
+        cv_oy = strip ? -62 : 0;
+        /* shaded area under curve */
+        for (px = 0; px <= 201u; px++) {
+            uint32_t vin = (px * 127u + 100u) / 201u;
+            uint32_t vout = vcurve_eval_raw(vin);
+            int32_t py = y1 - (int32_t)((vout * 101u + 63u) / 127u);
+            cv_rect(x0 + (int32_t)px, py, 1, y1 - py + 1, C_LINE);
+        }
+        /* live NoteOn / fading NoteOff vertical lines + curve intersection dots */
+        for (i = 0; i < VC_SLOTS; i++) {
+            uint32_t st = vc_notes[i].state;
+            if (!st) continue;
+            uint32_t g = 150u;
+            if (st == 2u) {
+                uint32_t dt = fm1_ms - vc_notes[i].t_rel;
+                if (dt >= VC_FADE_MS) continue;
+                g = 150u * (VC_FADE_MS - dt) / VC_FADE_MS;
+            }
+            if (g) {
+                uint32_t vin = vc_notes[i].vel_in;
+                uint32_t vout = vcurve_eval_raw(vin);
+                int32_t vx = x0 + (int32_t)((vin * 201u + 63u) / 127u);
+                int32_t vy = y1 - (int32_t)((vout * 101u + 63u) / 127u);
+                uint16_t col = RGB(g, g, g);
+                cv_rect(vx, y0, 1, y1 - y0 + 1, col);
+                cv_rect(vx - 1, vy - 1, 3, 3, st == 1u ? C_WHITE : col);
+            }
+        }
+        /* L-shaped axes */
+        cv_rect(x0 - 1, y0, 1, y1 - y0 + 2, FC_LAB);
+        cv_rect(x0 - 1, y1 + 1, x1 - x0 + 2, 1, FC_LAB);
+        /* Y-axis dynamic labels: fff (top) .. ppp (bottom) */
+        for (i = 0; i < 8u; i++) {
+            const char *lb = VC_DYN[7u - i];
+            int32_t ly = y0 + (int32_t)(i * 96u / 7u);
+            vc_txt(26 - vc_txt_w(lb), ly, lb, FC_LAB);
+        }
+        /* X-axis ticks & labels: 0, 25, 50, 75, 100, 127 */
+        for (i = 0; i < 6u; i++) {
+            int32_t tx = x0 + (int32_t)((XT[i] * 201u + 63u) / 127u);
+            int32_t lw = vc_txt_w(XL[i]);
+            int32_t lx = tx - lw / 2;
+            if (lx + lw > 239) lx = 239 - lw;
+            cv_rect(tx, y1 + 2, 1, 2, FC_LAB);
+            vc_txt(lx, 112, XL[i], FC_LAB);
+        }
+        /* piecewise-linear curve segments */
+        {
+            int32_t lx = x0, ly = y1 - (int32_t)((vcurve_eval_raw(0u) * 101u + 63u) / 127u);
+            for (i = 0; i < VC_NPTS; i++) {
+                int32_t nx = x0 + (int32_t)((set.vc_x[i] * 201u + 63u) / 127u);
+                int32_t ny = y1 - (int32_t)((set.vc_y[i] * 101u + 63u) / 127u);
+                cv_line(lx, ly, nx, ny, C_HI);
+                lx = nx; ly = ny;
+            }
+            cv_line(lx, ly, x1, y1 - (int32_t)((vcurve_eval_raw(127u) * 101u + 63u) / 127u), C_HI);
+        }
+        /* 6 control point dots */
+        for (i = 0; i < VC_NPTS; i++) {
+            int32_t nx = x0 + (int32_t)((set.vc_x[i] * 201u + 63u) / 127u);
+            int32_t ny = y1 - (int32_t)((set.vc_y[i] * 101u + 63u) / 127u);
+            if (i == vc_sel) {
+                cv_rect(nx - 3, ny - 3, 7, 7, UI_ACC);
+                cv_rect(nx - 2, ny - 2, 5, 5, C_WHITE);
+            } else {
+                cv_rect(nx - 2, ny - 2, 5, 5, FC_VAL);
+            }
+        }
+        cv_oy = 0;
+        cv_blit(0, 42u + strip * 62u);
+    }
+}
+FR_COLD static void vcurve_poll(void)
+{
+    static uint32_t t;
+    uint32_t i, fading = 0u;
+    if (ui_page != PG_VCURVE || fm1_ms - t < 33u) return;
+    t = fm1_ms;
+    for (i = 0; i < VC_SLOTS; i++) {
+        if (vc_notes[i].state == 2u) {
+            if (fm1_ms - vc_notes[i].t_rel >= VC_FADE_MS) { vc_notes[i].state = 0u; vc_dirty = 1u; }
+            else fading = 1u;
+        }
+    }
+    if (vc_dirty || fading) { vc_dirty = 0u; ui_mark(E_METER); }
 }
 
 /* the footer (210..239): the save prompt, a message for MSG_MS (the TYPE flash large), the COMPRESSOR's meter, the
@@ -1636,9 +1816,9 @@ FR_COLD static void draw_footer(void)
         ft_c(22, page_hint(ui_page), FC_DIM);
     } else if (ui_page == PG_SETUP) {                   /* what this is: the name, the version, the battery's reading
                                                          * (calibration), the audio's time */
-        char t[32];
+        char t[36];
         uint32_t n;
-        p_strcpy(t, "FRODHES ", 8); p_strcpy(t + 8, ui_version(), 12);
+        p_strcpy(t, "FRODHES-BARK ", 13); p_strcpy(t + 13, ui_version(), 10);
         n = 0; while (t[n]) n++;
         p_strcpy(t + n, "  BAT ", 6); p_fmt_int(t + n + 6, batt_raw());
         ft_c(7, t, UI_ACC);
@@ -1715,7 +1895,8 @@ FR_COLD static void ui_splash(void)
     cv_rect(40, 30, 160, 2, C_LINE);
     cv_blit(0, 46);
     cv_begin(240, 64, C_BLACK);
-    ft_big(16, "FRODHES", UI_ACC);
+    if (big_ok("FRODHES-BARK", 236)) ft_big(16, "FRODHES-BARK", UI_ACC);
+    else ft_c(16, "FRODHES-BARK", UI_ACC);
     ft_c(48, "ELECTRIC PIANO + VIBES + MARIMBA", FC_LAB);
     cv_blit(0, 110);
     cv_begin(240, 20, C_BLACK);
@@ -1781,6 +1962,7 @@ FR_COLD static void ui_draw(void)
         ui_mark(E_CARD0 + ui_hot_card);
     if (ui_page == PG_SETUP && (fm1_ms & 255u) == 0u) ui_mark(E_FOOTER);   /* live readouts */
     meter_poll();
+    vcurve_poll();
     if (ui_page == PG_SEQ) {                            /* the playhead ~25 Hz; the notes when they change (4 Hz) */
         static uint32_t ph_t, roll_t;
         uint32_t now, next, p = sq_view_tick();
@@ -1807,16 +1989,20 @@ FR_COLD static void ui_draw(void)
     else if (e == E_METER) {
         if (ui_page == PG_COMP && !pr_save_mode && !(ui_msg_t && fm1_ms - ui_msg_t < MSG_MS)) draw_meter();
         else if (ui_page == PG_SEQ) draw_strip();
+        else if (ui_page == PG_VCURVE) draw_vcurve();
     } else if (e == E_ROLL) { if (ui_page == PG_SEQ) draw_now(); }
-    else if (ui_page == PG_SEQ) { draw_card_small(e - E_CARD0); if (e == E_CARD0) ui_mark(E_ROLL); }
+    else if (ui_page == PG_SEQ || ui_page == PG_VCURVE) { draw_card_small(e - E_CARD0); if (ui_page == PG_SEQ && e == E_CARD0) ui_mark(E_ROLL); }
     else draw_row(e - E_CARD0);
 }
 
 /* ---- input */
 FR_COLD static void ui_goto_v(uint32_t pg, uint32_t vp)         /* a page (VOICE: its number vp) */
 {
+    int cust_new, cust_old;
     if (pg >= PG_N || pg == PG_RETIRED4) pg = PG_PERF;
-    if ((pg == PG_SEQ) != (ui_page == PG_SEQ)) lcd_fill(0, TI_Y, 240, FT_Y - TI_Y, C_BLACK);   /* its own layout: no leftovers */
+    cust_new = (pg == PG_SEQ || pg == PG_VCURVE);
+    cust_old = (ui_page == PG_SEQ || ui_page == PG_VCURVE);
+    if (cust_new != cust_old || (cust_new && pg != ui_page)) lcd_fill(0, TI_Y, 240, FT_Y - TI_Y, C_BLACK);   /* its own layout: no leftovers */
     ui_page = (uint8_t)pg;
     ui_vp = (uint8_t)(pg == PG_VOICE && vp < vp_count() ? vp : 0u);
     for (vp = 0; vp < 4u; vp++) ui_row_drawn[vp].kind = RK_NONE;   /* (drawn again below) */
@@ -1860,7 +2046,7 @@ FR_COLD static int32_t ui_accel(uint32_t k, uint32_t s, int32_t d)
     uint32_t a = (uint32_t)(d < 0 ? -d : d), gap = fm1_ms - ui_acc_t[k], dt = gap / a;
     ui_acc_t[k] = fm1_ms;
     if (!ui_accel_on || gap > 150u || (s < P_COUNT ? PARAMS[s].fmt == F_ENUM || PARAMS[s].fmt == F_DIV || PARAMS[s].hi < 32u || slot_synced(s)
-                                   : s != S_BPM && s != S_TUNE))
+                                   : s != S_BPM && s != S_TUNE && s != S_VCIN && s != S_VCOUT))
         return d;
     return d * (dt < 10u ? 8 : dt < 20u ? 4 : dt < 40u ? 2 : 1);
 }
@@ -1959,9 +2145,9 @@ FR_COLD static void ui_input(uint32_t b, uint32_t rel)
     for (k = 0; k < 4u; k++) {
         uint32_t s = slot_at(ui_page, k);
         if (!d[ENC_KNOB1 + k] || s == S_NONE) continue;
+        if (ui_msg_t) { ui_msg_t = 0; ui_mark(E_FOOTER); }   /* clear old message before turn (slot_turn may set a new one) */
         slot_turn(s, ui_accel(k, s, d[ENC_KNOB1 + k]));
         if ((ui_page == PG_PERF || (ui_page == PG_PIANO && s == P_DRIVE)) && s < P_COUNT) perf_wake(s);
-        if (ui_msg_t) { ui_msg_t = 0; ui_mark(E_FOOTER); }   /* an old message would contradict the card */
         if (ui_hot_card != k && ui_hot_card < 4u) ui_mark(E_CARD0 + ui_hot_card);
         ui_hot_card = (uint8_t)k; ui_hot_t = fm1_ms;
         ui_mark(E_CARD0 + k);

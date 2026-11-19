@@ -47,10 +47,18 @@ static void eng_send(uint32_t type, uint32_t n, uint32_t v)
 {
     uint32_t i;
     if (type == EV_NOTE_ON) {
-        if (n < 128u && v) { ped.down[n >> 5] |= 1u << (n & 31u); if (ped.on) ped.sus[n >> 5] |= 1u << (n & 31u); }
+        if (n < 128u && v) {
+            ped.down[n >> 5] |= 1u << (n & 31u);
+            if (ped.on) ped.sus[n >> 5] |= 1u << (n & 31u);
+            vcurve_note_on(n, v);
+            v = vcurve_map(v);
+        }
         eng_note_on(n, v);
     } else if (type == EV_NOTE_OFF) {
-        if (n < 128u) ped.down[n >> 5] &= ~(1u << (n & 31u));
+        if (n < 128u) {
+            ped.down[n >> 5] &= ~(1u << (n & 31u));
+            vcurve_note_off(n);
+        }
         eng_note_off(n, v);
     } else if (type == EV_PEDAL) {
         uint8_t on = v >= 64u;
@@ -60,6 +68,7 @@ static void eng_send(uint32_t type, uint32_t n, uint32_t v)
         live_pedal(on);
     } else {
         for (i = 0; i < 4u; i++) ped.down[i] = ped.sus[i] = 0;
+        vcurve_all_off();
         eng_all_off();
         live_pedal(0);
     }

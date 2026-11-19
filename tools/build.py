@@ -69,12 +69,10 @@ MODELS = {"pro": "SMK-37 Pro", "elite": "SMK-37 Elite", "mke": "MKE-P37"}   # sm
 MODEL_PID = {"pro": 0x0007, "elite": 0x0008, "mke": 0x0009}   # the app's USB product id per model (usb.c: the FM-1
                                     # 0x0006, the SMK-37 Pro 0x0007 by default; the name "Frodhes <model>", GitHub #21)
 DATA_FAMILY = "FRODHES"             # the SMK store's owner tag (store.h): 1..7 of A-Z 0-9
-SCREEN_NAME = "FRODHES"             # the update loader's screen (FM-1, ldr_screen.c): the name and its colour (RGB565)
+SCREEN_NAME = "FRODHES-BARK"        # the update loader's screen (FM-1, ldr_screen.c): the name and its colour (RGB565)
 SCREEN_COLOUR = 0xE3C1              # AMBER, the screen's default accent (ui.c COLOR step 0)
-PRODUCT = "FM-1_958"                # Frodhes, every version and dev builds: one identity (the hub's installer wants
-                                    # FM-1_9NN; 958 is not used by another firmware on thefirmwarehub.com, 2026-10).
-                                    # The version is only text (APP_VER), so releases never run out of numbers
-VERSION = None                      # APP_VER for release builds
+PRODUCT = "FM-1_1958"               # Frodhes-Bark, build 1958 identity
+VERSION = "1958"                    # APP_VER (overridable via --release)
 
 
 def toolchain():

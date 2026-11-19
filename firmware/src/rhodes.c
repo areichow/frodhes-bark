@@ -1479,7 +1479,7 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
     }
     if (wu) {
         const wu_key_t *wk = &WU_KEYS[ki];
-        v->off = wu_clamp_u((int64_t)wk->off + ty->off_delta + rh_tone_off);
+        v->off = wu_clamp_u((int64_t)wk->off + ty->off_delta + (((int64_t)rh_tone_off * 46341) >> 16));
         v->gain = mul16(mul16(wk->gain, rh_bark_g), ty->bark_g);
     } else {   /* TYPE, TONE and the cap are distances: in the 1/16" family's own gap (twice the 1/32") half as many (S8) */
         uint32_t sh = RH_FAM_SH[k->fam];

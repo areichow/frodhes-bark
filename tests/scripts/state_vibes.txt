@@ -77,6 +77,7 @@
 4820 turn 0 1
 4830 turn 0 1
 4832 turn 0 1
+4834 turn 0 1
 4900 expect state page COMPRESSOR
 4910 turn 1 1
 5000 expect state bars 1
@@ -84,6 +85,7 @@
 5000 expect sound
 5010 turn 0 -1
 5012 turn 0 -1
+5014 turn 0 -1
 5050 expect state vpage 3/4
 # ---- F13 by program change while a note rings: the swap and the load agree
 5100 midi 0x90 60 100

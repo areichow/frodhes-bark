@@ -3,7 +3,7 @@
 # 127; KEY VEL above 107 lifts the soft end instead (1 + KEY VEL - 107 at the lightest press). TOUCH MEDIUM.
 # KEY VEL: K3 of the velocity page (the last VOICE page, VOICE 3/3: FRODHES, then SELECT three times)
 100 btn 8
-150 expect state page FRODHES
+150 expect state page FRODHES-BARK
 160 turn 0 1
 170 turn 0 1
 180 turn 0 1

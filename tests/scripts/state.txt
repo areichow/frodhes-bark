@@ -259,7 +259,7 @@
 13300 expect state page PERFORM
 13300 expect led 8 1
 13400 btn 8
-13500 expect state page FRODHES
+13500 expect state page FRODHES-BARK
 13500 expect led 8 1
 13500 expect led 6 0
 13600 expect sound

@@ -11,7 +11,7 @@
  * (Dinghy / SLOOP / Felucca): updates, the USB rescue, USB-MIDI, USB audio, keys, knobs, LEDs, screen, settings.
  * Rules of the road (no FPU, no libgcc): integers only, no float, no 64-bit division. docs/RULES.md.
  * tests/host.c runs this file on a computer: the screen as a PNG, the sound as a WAV. */
-#define APP_NAME "FRODHES"
+#define APP_NAME "FRODHES-BARK"
 #define APP_OUT_SHIFT 8u   /* the codec at full scale: +6 dB on the jack over Dinghy's -6 dBFS ceiling (the look-ahead
                             * limiter keeps every sample under -2.7 dBFS, so it never clips; 0.8) */
 #define APP_OUT_WRITTEN 1   /* app_audio writes every sample of out (fx_process's limiter, with "="): platform.c does not
@@ -1925,7 +1925,13 @@ FR_COLD static int host_state(const char *key, char *v, unsigned n)
     uint32_t i, c;
     char t[24];
     v[0] = 0;
-    if (!strcmp(key, "header")) { if (set.preset < PR_NALL_UI) preset_name(set.preset, t); else p_strcpy(t, "FRODHES", 8); t[14] = 0; snprintf(v, n, "%s", t); }
+    if (!strcmp(key, "header")) { if (set.preset < PR_NALL_UI) preset_name(set.preset, t); else p_strcpy(t, "FRODHES-BARK", 13); t[14] = 0; snprintf(v, n, "%s", t); }
+    else if (!strcmp(key, "vcid")) {
+        uint32_t ok = 1u;
+        for (i = 1u; i <= 127u; i++) if (vcurve_map(i) != i) { ok = 0u; break; }
+        snprintf(v, n, "%u", (unsigned)ok);
+    }
+    else if (sscanf(key, "vcmap.%u", &a) == 1 && a <= 127u) snprintf(v, n, "%u", (unsigned)vcurve_map(a));
     else if (!strcmp(key, "preset")) snprintf(v, n, "%u", set.preset);
     else if (!strcmp(key, "bpm10")) snprintf(v, n, "%u", tempo_bpm10());          /* the tempo shown (tempo.c) */
     else if (!strcmp(key, "setbpm")) snprintf(v, n, "%u", set.bpm10);             /* the tempo setting */
