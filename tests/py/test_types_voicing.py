@@ -71,7 +71,7 @@ def test_bark_grows_with_velocity(binr):
             assert abs(h[3] - h[0]) < 3.0 and all(b > a - 0.5 for a, b in zip(h, h[1:])), (n, h)
             continue
         assert all(b > a - 0.5 for a, b in zip(h, h[1:])), (n, h)         # rises with velocity
-        assert h[3] > h[0] + 6 and h[3] < 1.0, (n, h)                      # audibly brighter, barking
+        assert h[3] > h[0] + 6 and h[3] < 22.0, (n, h)                     # Stage 73 bark (F01 TONE 112: up to ~+18 dB at A2)
 
 
 @pytest.mark.parametrize("ti", [0, 3])                  # STAGE 77, DYNO (its +0.1 gap meets the offset cap)

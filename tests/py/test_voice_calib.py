@@ -63,26 +63,24 @@ def test_neighbour_keys_even(vel):
 
 
 def test_bark_grows_with_velocity(vel):
-    # Phase 1: with pickup_drive enabled (bark_physical: false), keys >= 85 (no_rise_key) are intentionally
-    # held flat at -35 dB so high treble stays clean, while bass/low-mid keys 28..52 stay flat below the knee
-    # and grow strongly (> 12 dB) above it.
+    # Phase 1B: calibrated to real Stage 73 bark (+8..+15 dB H2/H1 at v127 in bass/low-mid, warm -20 dB below
+    # the v48 knee, keys >= 85 held clean at -35 dB).
     h = vel["H21"]
     med = lambda v: float(np.median(h[:, jv(v)]))
-    assert med(64) < -18 and med(104) < med(127) < -3, (med(64), med(104), med(127))
-    assert h[:, jv(127)].max() < 0.0, h[:, jv(127)].max()            # H2 under H1 on every key at v127
+    assert med(64) < -18 and med(104) < med(127) < 8.0, (med(64), med(104), med(127))
+    assert 8.0 < h[:, jv(127)].max() < 18.0, h[:, jv(127)].max()     # Stage 73 bark ceiling (+8..+15 dB)
     top = [KEYS.index(n) for n in range(86, 104)]
     assert np.abs(h[top, jv(127)] - h[top, jv(40)]).max() < 2.5      # top keys held clean
     bass = [KEYS.index(n) for n in range(28, 53)]
-    assert np.abs(h[bass, jv(48)] - h[bass, jv(1)]).max() < 1.5      # flat below the knee
+    assert np.abs(h[bass, jv(40)] - h[bass, jv(1)]).max() < 1.5      # flat below the v48 knee
     assert np.all(h[bass, jv(127)] - h[bass, jv(64)] > 12.0)         # strong bark rise above the knee
     assert np.all(np.diff(h[:, jv(40):], axis=1) > -0.5)  # every key's H2/H1 rises with velocity
 
 
 def test_timbre_continuous_across_keys(vel):
     f0 = np.array([BY[n]["f0"] for n in KEYS])
-    # Phase 1: keys 72..76 transition into the clean upper register (soft_bark -24..-32 dB = 2.0 dB/key,
-    # knee 80..106 = +1.7 dB/key above knee -> up to ~3.8 dB/key at v104/v127 across keys 72..76)
-    for v, cm, hm in ((64, 0.1, 2.5), (104, 0.2, 4.2), (127, 0.2, 4.2)):
+    # Phase 1B: keys 71..76 transition from mid bark (-1.5 dB) into the clean upper register (-19 dB)
+    for v, cm, hm in ((64, 0.1, 2.5), (104, 0.2, 4.2), (127, 0.25, 4.2)):
         c = np.log2(vel["CEN"][:, jv(v)] / f0)
         assert np.abs(np.diff(c)).max() < cm, v
         assert np.abs(np.diff(vel["H21"][:, jv(v)])).max() < hm, v

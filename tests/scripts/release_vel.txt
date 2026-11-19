@@ -11,18 +11,21 @@
 # -56.3 / -66.3 / -45.9, the neutral window -58..-49.
 # 0.9.13 (SND3, RESPONSE FULL's convex velocity curve): v100 plays 2.9 dB quieter (the same tone), every window
 # -3 dB (C4 neutral -53.5, quick -61.5, slow -45.3; C5 -58.5 / -68.6 / -48.2); the order and the gaps as before.
+# Phase 1B (Stage 73 bark calibration, F01 P_BARK 64): more H2..H5 at v100 lowers C4's fundamental gain ~4 dB for
+# the same v100 RMS, so C4's linear release tail sits ~4.5 dB lower (neutral -58.0, quick -66.0, slow -49.8, FM-1
+# key -58.4); the order and the +-8 dB gaps are unchanged.
 # Run: build/host/frodhes build/host/release_vel tests/scripts/release_vel.txt
 40 midi 0xB0 119 127
 100 midi 0x90 60 100
 600 midi 0x80 60 0
-700 expect rms < -50
-700 expect rms > -58
+700 expect rms < -54
+700 expect rms > -62
 1500 midi 0x90 60 100
 2000 midi 0x80 60 127
-2100 expect rms < -58
+2100 expect rms < -62
 2900 midi 0x90 60 100
 3400 midi 0x80 60 1
-3500 expect rms > -49
+3500 expect rms > -53
 4300 midi 0x90 72 100
 4800 midi 0x80 72 64
 4900 expect rms < -52
@@ -39,8 +42,8 @@
 # the FM-1's key C4: no release speed, the neutral release (as 0 / 64 over MIDI)
 9900 keys 0x80
 10400 keys 0
-10500 expect rms < -50
-10500 expect rms > -58
+10500 expect rms < -54
+10500 expect rms > -62
 12500 expect rms < -60
 # RELEASE 127 (CC 103): x8, the long release of before (C4 T60 ~1.4 s): 100 ms after the key-up -32 dB (neutral -50.8)
 12600 midi 0xB0 103 127

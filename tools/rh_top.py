@@ -47,14 +47,12 @@ G_MAX = 8                              # the loudness's gain back at most 1.5 dB
 # span (RH_TOP_S, velocity steps from the knee to v127; 0 = the 1.25 R default), the shortest whose straight line in
 # dB stays over the cut each probe velocity needs, so H2 rises with velocity only up to the ceiling. The loudness's
 # gain back (RH_TOP_G) rides the square of that ramp (rhodes.c rh_top_x), held to G64_DB at v64 (the mf level as it was)
-CAP_K0 = 72
-# per TYPE (STAGE 77, SUITCASE, FELT, DYNO): the v127 target's offset at and under CAP_K0, dB (0.9.12: SUITCASE -4, its
-# clean, round voicing, pickups further from the tines: the same TARGET for every TYPE cut each to the same H2 and
-# brought SUITCASE within 0.9 dB of STAGE 77's spectrum, hil_scan types)
-TOP_POINTS = [[21, -2.5], [40, -3.0], [52, -4.0], [64, -9.0], [72, TARGET]]
-TYPE_D = (0.0, -4.0, -2.5, 1.5)
+CAP_K0 = 76
+# per TYPE (STAGE 77, SUITCASE, FELT, DYNO): the v127 target's offset at and under CAP_K0, dB
+TOP_POINTS = [[21, 9.5], [40, 13.0], [50, 14.0], [59, 8.5], [64, 5.5], [71, -0.5], [76, TARGET]]
+TYPE_D = (0.0, -4.5, -2.5, 4.5)
 G64_DB = 0.3
-CAP_POINTS = [[72, TARGET], [76, -30.0], [84, -31.0], [90, -35.0], [108, -35.0]]
+CAP_POINTS = [[76, TARGET], [80, -30.0], [84, -31.0], [90, -35.0], [108, -35.0]]
 CAP_VELS = (20, 40, 64, 88, 104, 120, 127)
 CFLAGS = ["-O2", "-Wall", "-Wno-unused-function", "-DDINGHY_HOST", '-DAPP_VER="dev"', "-Ifirmware/src",
           "-Ifirmware/gen"]
@@ -201,10 +199,14 @@ def main():
             for j, k in enumerate(keys):
                 r = 0.0
                 for w in (0, 1):                                   # H2, aH2
-                    p0, p1 = 10 ** (m0[(ty, 0)][(k, 127)][w] / 10), 10 ** (m1[(ty, 0)][(k, 127)][w] / 10)
+                    h0, h1 = m0[(ty, 0)][(k, 127)][w], m1[(ty, 0)][(k, 127)][w]
+                    p0, p1 = 10 ** (h0 / 10), 10 ** (h1 / 10)
                     n2 = max(p0 - p1, 0.0) / (1 - c2)
                     if n2 > 0:
-                        r = max(r, (10 * np.log10(n2) - cap_db(k, ty)) / UNIT)
+                        # Deep bark (H2/H1 > 0 dB): H1 saturates so H2/H1 drops faster than 1 dB per 1 dB of swing cut;
+                        # use the measured probe slope (h0 - h1) / (PROBE_R * UNIT) to avoid over-cutting DYNO below STAGE 77.
+                        slope = max(1.0, (h0 - h1) / (PROBE_R * UNIT)) if h0 > 0.0 else 1.0
+                        r = max(r, (10 * np.log10(n2) - cap_db(k, ty)) / (UNIT * slope))
                 R[ty, j] = min(R_MAX, max(0, int(np.ceil(r))))
         # above CAP_K0: the ceiling at every velocity. The pickup's H2 at each probe velocity is the no-cut build's
         # less what else sits at 2 f0 (L^2, from the two v127 swings above: the same re H1 at any swing)
