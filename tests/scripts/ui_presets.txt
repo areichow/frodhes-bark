@@ -40,28 +40,52 @@
 3900 midi 0xC0 13 0
 4000 expect led 5 0
 4000 expect state vcard.2.0 OFF
-# PRESETS after F14: F15, F16 (MARIMBA), F17..F19 (0.9.5), then U01 (the user presets follow the factory ones),
+# PRESETS after F14: F15, F16 (MARIMBA), F17..F19 (Rhodes), F20..F31 (Wurlitzer), then U01 (18 detents),
 # back: F14, F13
 4100 turn 6 1
+4105 turn 6 1
+4110 turn 6 1
+4115 turn 6 1
 4120 turn 6 1
+4125 turn 6 1
+4130 turn 6 1
+4135 turn 6 1
 4140 turn 6 1
+4145 turn 6 1
+4150 turn 6 1
+4155 turn 6 1
 4160 turn 6 1
+4165 turn 6 1
+4170 turn 6 1
+4175 turn 6 1
 4180 turn 6 1
-4200 turn 6 1
+4185 turn 6 1
 4700 expect led 5 1
 4700 expect state header U01_SUIT_TRM
 4800 turn 6 -1
+4805 turn 6 -1
+4810 turn 6 -1
+4815 turn 6 -1
 4820 turn 6 -1
+4825 turn 6 -1
+4830 turn 6 -1
+4835 turn 6 -1
 4840 turn 6 -1
+4845 turn 6 -1
+4850 turn 6 -1
+4855 turn 6 -1
 4860 turn 6 -1
+4865 turn 6 -1
+4870 turn 6 -1
+4875 turn 6 -1
 4880 turn 6 -1
-4900 turn 6 -1
+4885 turn 6 -1
 5400 expect led 5 0
 5400 expect state header F14_VIBES_ECHO
 5500 turn 6 -1
 6000 expect led 5 0
 6000 expect state vcard.2.0 ON
-# F17..F19 by program change 32..34 (0.9.5: 0..15 F01..F16 and 16..31 U01..U16 as before); 35 is no preset
+# F17..F31 by program change 32..46 (0..15 F01..F16 and 16..31 U01..U16 as before); 47 is no preset
 6100 midi 0xC0 32 0
 6200 expect state header F17_TAPE_ECHO
 6200 expect preset
@@ -73,13 +97,16 @@
 6600 expect state header F19_WARM_DRIVE
 6600 expect preset
 6600 expect sound
-6700 midi 0xC0 35 0
-6800 expect state header F19_WARM_DRIVE
-6800 expect state preset 18
-# PRESETS from F19: U01 (one detent), back: F19
+6650 midi 0xC0 46 0
+6680 expect state header F31_WURLI_DRV
+6680 expect preset
+6700 midi 0xC0 47 0
+6800 expect state header F31_WURLI_DRV
+6800 expect state preset 30
+# PRESETS from F31: U01 (one detent), back: F31
 6900 turn 6 1
 7400 expect state header U01_SUIT_TRM
-7400 expect state preset 19
+7400 expect state preset 31
 7500 turn 6 -1
-8000 expect state header F19_WARM_DRIVE
+8000 expect state header F31_WURLI_DRV
 8100 end

@@ -10,8 +10,8 @@
  *   MIDI PC           0..15 -> F01..F16, 16..31 -> U01..U16 (as before 0.9.5), 32..34 -> F17..F19 (preset_of_pc) */
 #include "fr_cold.h"   /* FR_COLD (the cold code: minsize on the firmware) */
 
-#define PR_NF 19u                               /* 12 Rhodes (F01..F12), the bar types' F13..F16, then F17..F19
-                                                 * Rhodes (0.9.5: the starters U10..U12 before) */
+#define PR_NF 31u                               /* 12 Rhodes (F01..F12), bars (F13..F16), F17..F19 Rhodes,
+                                                 * F20..F31 Wurlitzer 140B & 200A (1959) */
 #define PR_NU 16u
 _Static_assert(PR_NF == PR_NF_UI && PR_NF + PR_NU == PR_NALL_UI && PR_NF == PR_NF_SET, "ui.c / params.c preset counts");
 _Static_assert(PR_NF >= 16u && PR_NF <= 16u + 96u, "program changes 0..15: F01..F16, 16..31: U01..U16, 32..: F17..");
@@ -88,7 +88,8 @@ _Static_assert(sizeof pr_user == ST_TAIL_N, "the user presets are the store reco
 static const char *const PR_FNAME[PR_NF] = {
     "STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "WARM 77", "PUNCH 77", "BALLAD", "SUIT TREM", "70S PHASER",
     "FUNK WAH", "RESO SWEEP", "LUSH CHO", "VIBES", "VIBES ECHO", "MARIMBA", "WOOD ECHO", "TAPE ECHO", "DREAM",
-    "WARM DRIVE"};   /* (the header shows 14 characters: names up to 10) */
+    "WARM DRIVE", "WURLI 200A", "WURLI 140B", "WARM 140B", "PUNCH 200A", "WURLI BLD", "WURLI TREM", "200A PHASE",
+    "WURLI WAH", "WURLI SWP", "WURLI CHO", "WURLI TAPE", "WURLI DRV"};   /* (header: 14 chars -> names <= 10) */
 static const uint8_t PR_FDATA[] = {   /* the factory records, one after another: id / value pairs, 0xFF ends each */
     /* F01 STAGE 77: the clean stage piano (the boot sound and the level reference): a bright TONE, the bell full, the
      * bark lower, a trace of hall */
@@ -187,6 +188,54 @@ static const uint8_t PR_FDATA[] = {   /* the factory records, one after another:
     P_RV_DEPTH, 16, P_RV_TYPE, 2, P_RV_LOCUT, 80, P_LEVEL, 64, P_DRIVE, 40, P_DRV_SW, 2, P_DRV_TONE, 70, P_CP_SW, 1,
     P_CP_DEPTH, 50, P_CP_SPEED, 36, P_DL_SW, 3, P_DL_DEPTH, 12, P_DL_SYNC, 8, P_DL_FDBK, 30, P_DL_TONE, 56,
     P_TONE, 64, P_BARK, 64, P_BELL, 64, P_HAMMER, 64, P_DECAY, 64, 0xFF,
+    /* F20 WURLI 200A: dry 200A reference (mirrors F01), neutral voicing, glue comp, subtle hall */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_RV_DEPTH, 16, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_LEVEL, 57, 0xFF,
+    /* F21 WURLI 140B: warm dry 140B (mirrors F02), gentle 1.5:1 comp, subtle hall */
+    P_TYPE, 6, P_NOISE, 44, P_CMP_SW, 1, P_CMP_AMT, 36, P_CMP_RATIO, 0, P_CMP_ATK, 40, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_RV_DEPTH, 16, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_LEVEL, 48, 0xFF,
+    /* F22 WARM 140B: warm round 140B (mirrors F05), mild bark, subtle hall */
+    P_TYPE, 6, P_CMP_SW, 1, P_CMP_AMT, 36, P_CMP_RATIO, 1, P_CMP_ATK, 40, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_RV_DEPTH, 12, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_TONE, 54, P_BARK, 72, P_DECAY, 72, P_LEVEL, 49, 0xFF,
+    /* F23 PUNCH 200A: punchy barky 200A (mirrors F06), firm hammer, fast 1.5:1 comp, hall */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 36, P_CMP_RATIO, 0, P_CMP_ATK, 40, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_RV_DEPTH, 16, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_TONE, 76, P_BARK, 84, P_BELL, 84, P_HAMMER, 112, P_LEVEL, 55, 0xFF,
+    /* F24 WURLI BLD: round 140B ballad (mirrors F07), slow chorus, quarter echo, long plate */
+    P_TYPE, 6, P_NOISE, 40, P_TONE, 52, P_BELL, 56, P_CMP_SW, 1, P_CMP_AMT, 36, P_CMP_RATIO, 2, P_CMP_ATK, 40,
+    P_CMP_REL, 72, P_CMP_GAIN, 8, P_CP_SW, 1, P_CP_DEPTH, 56, P_CP_SPEED, 40, P_DL_SW, 1, P_DL_DEPTH, 12,
+    P_DL_SYNC, 9, P_DL_FDBK, 30, P_DL_TONE, 50, P_RV_DEPTH, 44, P_RV_TYPE, 2, P_RV_DECAY, 84, P_RV_PREDLY, 40,
+    P_RV_LOCUT, 70, P_LEVEL, 38, 0xFF,
+    /* F25 WURLI TREM: classic 200A amp vibrato (mirrors F08, AM tremolo), subtle drive, plate */
+    P_TYPE, 7, P_NOISE, 44, P_DRIVE, 20, P_TW_SW, 1, P_TW_MODE, 1, P_TW_DEPTH, 76, P_TW_RATE, 96, P_CMP_SW, 1,
+    P_CMP_AMT, 36, P_CMP_RATIO, 3, P_CMP_ATK, 100, P_CMP_REL, 72, P_CMP_GAIN, 8, P_RV_DEPTH, 20, P_RV_TYPE, 2,
+    P_RV_LOCUT, 70, P_BARK, 72, P_LEVEL, 58, 0xFF,
+    /* F26 200A PHASE: 70s phaser + BHLUE drive + analog echo + plate (mirrors F09) */
+    P_TYPE, 7, P_DRIVE, 32, P_DRV_SW, 5, P_BARK, 56, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80,
+    P_CMP_REL, 72, P_CMP_GAIN, 8, P_PH_SW, 1, P_PH_DEPTH, 85, P_PH_SPEED, 30, P_PH_FDBK, 64, P_DL_SW, 2,
+    P_DL_DEPTH, 12, P_DL_SYNC, 9, P_DL_FDBK, 30, P_DL_TONE, 50, P_RV_DEPTH, 22, P_RV_TYPE, 2, P_RV_LOCUT, 70,
+    P_LEVEL, 70, 0xFF,
+    /* F27 WURLI WAH: TSH8 drive + touch wah + bark up + room (mirrors F10) */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 56, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 24,
+    P_DRIVE, 42, P_DRV_SW, 3, P_TW_SW, 2, P_TW_DEPTH, 92, P_TW_RATE, 72, P_BARK, 80, P_RV_DEPTH, 14, P_RV_TYPE, 1,
+    P_RV_LOCUT, 80, P_LEVEL, 31, 0xFF,
+    /* F28 WURLI SWP: OHCD drive + resonant LP12 LFO sweep + digital echo + hall (mirrors F11) */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 3, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_DRIVE, 48, P_DRV_SW, 4, P_DRV_TONE, 60, P_FL_TYPE, 1, P_FL_FREQ, 76, P_FL_RESO, 88, P_FL_LFO, 64,
+    P_LFO_SHAPE, 1, P_LFO_SYNC, 13, P_DL_SW, 1, P_DL_DEPTH, 14, P_DL_SYNC, 9, P_DL_FDBK, 40, P_DL_TONE, 60,
+    P_RV_DEPTH, 20, P_RV_TYPE, 1, P_RV_LOCUT, 80, P_LEVEL, 44, 0xFF,
+    /* F29 WURLI CHO: 140B + lush chorus + dotted-1/8 tape echo + plate (mirrors F12) */
+    P_TYPE, 6, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_RV_DEPTH, 20, P_RV_TYPE, 2, P_RV_LOCUT, 80, P_CP_SW, 1, P_CP_DEPTH, 64, P_CP_SPEED, 44, P_DL_SW, 3,
+    P_DL_DEPTH, 16, P_DL_SYNC, 8, P_DL_FDBK, 40, P_DL_TONE, 58, P_LEVEL, 43, 0xFF,
+    /* F30 WURLI TAPE: crisp 200A + subtle drive + dotted-1/8 tape echo + plate (mirrors F17) */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_DRIVE, 22, P_DL_SW, 3, P_DL_DEPTH, 26, P_DL_SYNC, 8, P_DL_FDBK, 68, P_DL_TONE, 62, P_RV_DEPTH, 20,
+    P_RV_TYPE, 2, P_RV_LOCUT, 80, P_TONE, 72, P_BARK, 56, P_LEVEL, 49, 0xFF,
+    /* F31 WURLI DRV: KHLON warm overdrive + chorus + tape echo + plate (mirrors F19) */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    P_RV_DEPTH, 16, P_RV_TYPE, 2, P_RV_LOCUT, 80, P_DRIVE, 38, P_DRV_SW, 2, P_DRV_TONE, 70, P_CP_SW, 1,
+    P_CP_DEPTH, 48, P_CP_SPEED, 36, P_DL_SW, 3, P_DL_DEPTH, 12, P_DL_SYNC, 8, P_DL_FDBK, 30, P_DL_TONE, 56,
+    P_LEVEL, 45, 0xFF,
 };
 /* factory record idx (< PR_NF): the records are stored back to back (0.9.6: no padding to 64 bytes, 423 B less) */
 FR_COLD static const uint8_t *pr_fdata(uint32_t idx)

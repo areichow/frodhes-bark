@@ -72,8 +72,8 @@ FR_COLD static void eng_set_type(uint32_t t) { rh_type = (uint8_t)(t < N_TYPE_N 
 FR_COLD static int eng_is_bars(void) { return 0; }       /* the engine plays bars for the TYPE last set (not the ISR latch) */
 FR_COLD static void eng_bar_knob(uint32_t k, uint32_t v) { (void)k; (void)v; }
 #endif
-#define PR_NF_SET 19u              /* presets.c PR_NF: the factory presets (12 before VIBES, 14 before MARIMBA, 16
-                                    * before F17..F19, 0.9.5) */
+#define PR_NF_SET 31u              /* presets.c PR_NF: the factory presets (12 before VIBES, 14 before MARIMBA, 16
+                                    * before F17..F19, 19 before F20..F31 Wurlitzer) */
 static const char *const N_TW[] = {"OFF", "TRM", "WAH"};
 static const char *const N_CP[] = {"OFF", "CHO", "PHA"};   /* "PHA": records before 0.4 */
 static const char *const N_ONOFF[] = {"OFF", "ON"};
@@ -442,7 +442,7 @@ FR_COLD static void params_defaults(void)
     set.ver = SET_VER;
     set.flags = 4u | 32u | 64u | 128u;   /* a fresh record: its preset index is already in today's layout (19 factory:
                                     * flags2 1), its PERFORM knobs today's defaults */
-    set.flags2 = 1u | 2u;
+    set.flags2 = 1u | 2u | 4u;
     set.preset = 0;
     set.bpm10 = 1200;
     set.clock = 1;                 /* EXT: follows MIDI clock when it comes (USB or TRS) */
@@ -509,9 +509,16 @@ FR_COLD static void params_sanitize(void)
                                                       * the starters: presets_load_bank (set_pr_from_rc) */
         set_pr_from_rc = (uint8_t)((set.preset >= 16u + 9u && set.preset < 16u + 12u) ||
                                    (set.undo_preset >= 17u + 9u && set.undo_preset < 17u + 12u));
-        if (set.preset >= 16u && set.preset < 16u + 16u) set.preset = (uint8_t)(set.preset + PR_NF_SET - 16u);
-        if (set.undo_preset >= 17u && set.undo_preset < 17u + 16u) set.undo_preset = (uint8_t)(set.undo_preset + PR_NF_SET - 16u);
+        if (set.preset >= 16u && set.preset < 16u + 16u) set.preset = (uint8_t)(set.preset + 19u - 16u);
+        if (set.undo_preset >= 17u && set.undo_preset < 17u + 16u) set.undo_preset = (uint8_t)(set.undo_preset + 19u - 16u);
         set.flags2 |= 1u;
+    }
+    if (!(set.flags2 & 4u)) {                        /* 1959: 19 -> 31 factory presets (F20..F31 Wurlitzer; U01 = 31) */
+        if (set.preset >= 19u && set.preset < 19u + 16u)
+            set.preset = (uint8_t)(set.preset + PR_NF_SET - 19u);
+        if (set.undo_preset >= 20u && set.undo_preset < 20u + 16u)
+            set.undo_preset = (uint8_t)(set.undo_preset + PR_NF_SET - 19u);
+        set.flags2 |= 4u;
     }
     if (!(set.flags & 64u)) params_perf_update();     /* records up to 0.9.4: the PERFORM defaults (above) */
     if (!(set.flags & 128u)) {                        /* records before the reverb's TYPE: its ids at their defaults

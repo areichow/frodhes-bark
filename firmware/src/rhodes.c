@@ -151,7 +151,8 @@ typedef struct {
     int32_t pamp;
     const int16_t *ptab;                       /* the hammer pulse shape: a table's layer, or pbuf */
     uint16_t felt_n;                           /* felt-noise samples left (key-up) */
-    int32_t felt_lp;
+    int32_t felt_lp, tw;                       /* tw: key-off harmonic twang impulse fired when damper seats */
+    uint8_t tw_dly;                            /* sub-blocks (~0.73 ms each) until twang fires */
     int16_t pbuf[RH_PLEN + 2];                 /* the two velocity layers around vel pre-mixed at the strike (no step at
                                                 * a layer change: the crossfade), the force loop reads one table */
     int32_t pan;                               /* Q8 stereo position (SPREAD, at the strike): -256 left .. 256 right */
@@ -1505,7 +1506,7 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
     u = v->off;
     v->Hprev = rh_hermite(wu ? WU_PHIM : RH_PU_PHIM(k->fam), (int64_t)u * u);
     v->alive = 1; v->held = 1; v->ramp = 0; v->w_tgt = 0;
-    v->fade = 32768; v->pend = 0; v->felt_n = 0; v->felt_lp = 0;
+    v->fade = 32768; v->pend = 0; v->felt_n = 0; v->felt_lp = 0; v->tw = 0; v->tw_dly = 0;
     v->age = ++rh_ages;
     v->life = wu ? WU_KEYS[ki].life : k->life;
     v->m[RH_V1].kap = 0;
@@ -1682,6 +1683,7 @@ static int rh_strike(uint32_t note, uint32_t vel)      /* 0: every voice already
                                                          * down, before the hammer arrives (a ramp under the strike
                                                          * stepped the modes' coefficients each sub-block while the
                                                          * force swung them: a click, +16 dB > 5 kHz with the map) */
+            v->tw = 0; v->tw_dly = 0;
 #ifdef RH_DRIVE
             rh_vel_old = vo;                            /* (unused at a note-on: the ratio is 1) */
             v->lt = (uint8_t)(rh_touch_mode != 0);      /* RESPONSE at this strike (a change: the re-strike's rescale
@@ -1770,6 +1772,26 @@ static void rh_events(void)                     /* the block's start (rh_render,
 #ifdef DINGHY_PLUGIN
                         v->pdly = 0;
 #endif
+                        /* Key-off harmonic twang (1959): damper felt plucking O1 (~6.3x f0) as felt seats */
+                        if (note < 84u) {
+                            int32_t ax = v->m[0].x < 0 ? -v->m[0].x : v->m[0].x;
+                            int32_t ay = v->m[0].y < 0 ? -v->m[0].y : v->m[0].y;
+                            int32_t a1 = ax > ay ? ax : ay;
+                            int32_t nz = rh_thump > 5304 ? 5304 + ((rh_thump - 5304) >> 5) : rh_thump;
+                            int32_t reg = note <= 72u ? 256 : (int32_t)(84u - note) * 256 / 12;
+                            int32_t g, tw;
+                            if (nz > 6400) nz = 6400;
+                            reg = (reg * (v->wu ? 12 : 9)) >> 3;
+                            g = mul15(nz, v->rgain);
+                            if (rh_pedal_w < 32768) g = mul15(g, rh_pedal_w);
+                            g = (g * reg) >> 8;
+                            tw = (int32_t)(((int64_t)a1 * g) >> 18);
+                            if (tw > 0) {
+                                uint32_t o1 = v->wu ? 1u : (uint32_t)RH_O1;
+                                int32_t o1_th = v->wu ? WU_KEYS[key].o1.th : v->k->m[RH_O1].th;
+                                if (o1_th) { v->m[o1].live = 1; v->tw = tw; v->tw_dly = note < 48u ? 22u : 16u; }
+                            }
+                        }
                     }
                     if (rh_pedal_w && rh_felt) {             /* 8 ms of felt noise */
                         int32_t g = rh_left(v) * (32768 / RH_FELT_FULL);
@@ -1825,7 +1847,7 @@ static void rh_events(void)                     /* the block's start (rh_render,
 #endif
                             if (g > lm) lm = g;
                         }
-                    g = lm < 0 ? 32768 : lm >> 2;
+                    g = lm < 0 ? 32768 : (lm * 3) >> 4;
                     rh_pn_n = RH_PN_LEN; rh_pn_env = g >= 32768 ? rh_pnz : (int32_t)(((uint32_t)rh_pnz * (uint32_t)g) >> 15);
 #ifdef RH_DRIVE
                     rh_pn_env = (int32_t)RH_NZ_S(rh_pn_env);   /* (the notes' level) */
@@ -2009,6 +2031,15 @@ FR_RAM2 static __attribute__((noinline)) void rh_voice_sub(rh_voice_t *v, int32_
             pt = s->eps0 + (int32_t)(((int64_t)(s->eps1 - s->eps0) * v->w_tgt) >> 15);
             s->e = s->es + (int32_t)(((int64_t)(et - s->es) * f) >> 15);
             s->eps = s->epss + (int32_t)(((int64_t)(pt - s->epss) * f) >> 15);
+        }
+    }
+    if (v->tw_dly) {
+        if (--v->tw_dly == 0u && v->tw) {
+            uint32_t o1 = v->wu ? 1u : (uint32_t)RH_O1;
+            v->m[o1].y = sat28i(v->m[o1].y + v->tw);
+            if (!v->wu && v->m[RH_O2].live)
+                v->m[RH_O2].y = sat28i(v->m[RH_O2].y + ((v->tw * 90) >> 8));
+            v->tw = 0;
         }
     }
     if (v->ptab) {                                        /* hammer force for the sub-block: the fields in locals

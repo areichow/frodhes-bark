@@ -1,0 +1,56 @@
+# Phase 4 (Build 1959): Key-off harmonic twang + F20..F31 Wurlitzer factory presets (PC 35..46)
+# 1. Load F20..F31 via MIDI Program Change 35..46 and verify header names & zero clipping.
+# 2. Verify key-off twang on STAGE 77 and W200 at NOISE = 0, 64, 127 without clipping or overflow.
+10 midi 0xC0 35 0
+50 expect state header F20_WURLI_200A
+50 expect state p.0 7
+100 midi 0x90 60 100
+250 midi 0x80 60 64
+300 midi 0xC0 36 0
+350 expect state header F21_WURLI_140B
+350 expect state p.0 6
+400 midi 0xC0 37 0
+450 expect state header F22_WARM_140B
+500 midi 0xC0 38 0
+550 expect state header F23_PUNCH_200A
+600 midi 0xC0 39 0
+650 expect state header F24_WURLI_BLD
+700 midi 0xC0 40 0
+750 expect state header F25_WURLI_TREM
+800 midi 0xC0 41 0
+850 expect state header F26_200A_PHASE
+900 midi 0xC0 42 0
+950 expect state header F27_WURLI_WAH
+1000 midi 0xC0 43 0
+1050 expect state header F28_WURLI_SWP
+1100 midi 0xC0 44 0
+1150 expect state header F29_WURLI_CHO
+1200 midi 0xC0 45 0
+1250 expect state header F30_WURLI_TAPE
+1300 midi 0xC0 46 0
+1350 expect state header F31_WURLI_DRV
+1400 midi 0x90 48 127
+1400 midi 0x90 52 127
+1400 midi 0x90 55 127
+1400 midi 0x90 59 127
+1700 midi 0x80 48 64
+1700 midi 0x80 52 64
+1700 midi 0x80 55 64
+1700 midi 0x80 59 64
+# Key-off twang on STAGE 77 & W200 (RAW) at NOISE 0, 64, 127
+2000 midi 0xB0 119 127
+2010 midi 0xB0 80 0
+2020 midi 0xB0 104 0
+2050 midi 0x90 60 100
+2250 midi 0x80 60 64
+2400 midi 0xB0 104 64
+2450 midi 0x90 60 100
+2650 midi 0x80 60 127
+2800 midi 0xB0 104 127
+2850 midi 0x90 48 100
+3050 midi 0x80 48 127
+3200 midi 0xB0 33 7
+3210 midi 0xB0 104 64
+3250 midi 0x90 60 100
+3450 midi 0x80 60 127
+3650 end
