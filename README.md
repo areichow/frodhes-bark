@@ -9,7 +9,7 @@ No samples: every note is calculated as you play it, from how the real instrumen
 and a pickup turns its motion into sound; a mallet strikes a bar and its tube rings along. Play softly and it is
 warm; play hard and it barks or rings.
 
-Frodhes is free. If you enjoy it, you can [buy the original developer a coffee](https://ko-fi.com/leomirabal).
+Frodhes-Bark is free. If you enjoy it, you can [buy the original developer a coffee](https://ko-fi.com/leomirabal).
 
 ## See what's new
 
@@ -36,37 +36,38 @@ Frodhes is free. If you enjoy it, you can [buy the original developer a coffee](
 the FM-1's screen, knobs and keys. Play it from your computer keyboard or a MIDI keyboard.
 -->
 
+You can also try Frodhes-Bark in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/). You'll need to download [`frodhes-bark-1958-c1.fwsc`](https://github.com/areichow/frodhes-bark/releases/download/v1958/frodhes-bark-1958-c1.fwsc) from this page first - hoping to add Frodhes-Bark added to the various FM-1 depots soon - thanks for checking it out!
+
 ## What you get
 
-- **Six instruments**: four electric pianos (STAGE 77, SUITCASE, EARLY FELT, BELL DYNO), a vibraphone with its
+- **Eight instruments**: fix electric pianos (STAGE 77, SUITCASE, EARLY FELT, BELL DYNO, WURLI 140B, WURLI 200A), a vibraphone with its
   motor (VIBES) and a marimba (MARIMBA).
 - **Effects**: compressor, 3-band EQ, drive with five overdrive types, resonant filter with its own LFO, tremolo /
   pan / wah, phaser, chorus, delay (digital, analog, tape) and reverb (hall, plate, infinite).
-- **For playing**: sustain pedal, velocity from the FM-1's own keys, chords, scales, arpeggiator, a pattern recorder
-  (1-16 bars, overdub, undo, a chance per step), tap tempo or MIDI clock.
+- **For playing**: sustain pedal, a configurable velocity curve, velocity from the FM-1's own keys, chords, scales, arpeggiator, a pattern recorder (1-16 bars, overdub, undo, a chance per step), tap tempo or MIDI clock.
 - **Connections**: MIDI over USB and the TRS input, pitch bend, audio over USB (to a computer, phone or tablet) as well as the headphone jack.
-- **Presets**: 19 factory sounds and 16 slots for your own.
+- **Presets**: 26 factory sounds and 16 slots for your own.
 - **A screen you can read**: one page at a time, one card per knob.
 
 What is new in each version: [the release notes](https://github.com/leonardoMirabal/frodhes/releases).
 
 ## Install on the FM-1
 
-1. Download [`frodhes.fwsc`](https://github.com/leonardoMirabal/frodhes/releases/latest/download/frodhes.fwsc).
+1. Download [`frodhes-bark-1958-c1.fwsc`](https://github.com/areichow/frodhes-bark/releases/download/v1958/frodhes-bark-1958-c1.fwsc).
    This link always gives the newest version.
 2. Connect the FM-1 with USB and install it from the browser (Chrome or Edge): open the
    [emulator page](https://leonardomirabal.github.io/frodhes/#install) and use **Install on your FM-1 or SMK-37**.
    Or from a terminal, in a copy of this repository:
    ```sh
    pip install mido python-rtmidi
-   python3 tools/fm1_install.py frodhes.fwsc
+   python3 tools/fm1_install.py frodhes-bark-1958-c1.fwsc
    ```
 3. If something goes wrong, switch the FM-1 off, hold **OCT−** and switch it on. This starts the USB rescue, and
    you can install again from there.
 
 **Both cores.** Frodhes runs the voices on one of the FM-1's two processor cores and the effects on the other:
 14 voices on every instrument, the reverb at the full sample rate, and a quick answer to a note (about 6.5 ms from
-MIDI to the headphone jack). `frodhes.fwsc` is the FM-1's only package; installing it over the one-core package of
+MIDI to the headphone jack). `frodhes-bark-1958-c1.fwsc` is the FM-1's only package; installing it over the one-core package of
 0.9.10 or 0.9.11 keeps your settings, presets and pattern.
 
 Your settings and presets stay when you update. 0.9.10 changes the factory presets and some of their program numbers
@@ -74,7 +75,8 @@ Your settings and presets stay when you update. 0.9.10 changes the factory prese
 firmware:
 [how](docs/MANUAL.md#going-back-to-the-original-firmware).
 
-## Where to find Frodhes
+<!--
+## Where to find Frodhes-Bark
 
 | Where | What it is |
 |---|---|
@@ -180,12 +182,6 @@ Manager; how to install it and what to report:
   <img src="docs/manual/img/mpc/mpc-delay.png?v=7bc9cbad" width="384" alt="Frodhes on the MPC: the chorus and the delay">
 </p>
 
-## Manual
-
-**[The user manual](docs/MANUAL.md)**: every page, knob and button, the presets, the effects and the MIDI map.
-
-![The PERFORM, VOICE, PHASER and COMPRESSOR pages on the FM-1](docs/manual/img/overview.png?v=d74540c8)
-
 ## Other keyboards
 
 Frodhes also runs on the SMK-37 Pro, SMK-37 Elite and MKE-P37, with 10 voices on one processor core. Read
@@ -195,7 +191,7 @@ The files on the [release page](https://github.com/leonardoMirabal/frodhes/relea
 
 | Device | File |
 | --- | --- |
-| M-VAVE FM-1 | `frodhes.fwsc` |
+| M-VAVE FM-1 | `frodhes-bark-1958-c1.fwsc` |
 | Ableton Move | `frodhes-module.tar.gz` |
 | SMK-37 Pro | `frodhes-smk37-pro.fwsc` |
 | SMK-37 Elite | `frodhes-smk37-elite.fwsc` |
@@ -203,9 +199,19 @@ The files on the [release page](https://github.com/leonardoMirabal/frodhes/relea
 | Desktop plugin, macOS | `frodhes-plugin-macos.pkg` or `frodhes-plugin-macos.zip` |
 | Desktop plugin, Windows | `frodhes-plugin-windows.zip` |
 | Desktop plugin, Linux | `frodhes-plugin-linux-x86_64.zip`, `frodhes-plugin-linux-aarch64.zip` |
+-->
+
+## Manual
+
+The user manual hasn't been udpated for Frodhes-Bark yet - but the Frodhes will help you get started.
+
+**[The user manual](docs/MANUAL.md)**: every page, knob and button, the presets, the effects and the MIDI map.
+
+![The PERFORM, VOICE, PHASER and COMPRESSOR pages on the FM-1](docs/manual/img/overview.png?v=d74540c8)
 
 ## Credits
 
+Frodhes-Bark is a fork of [Frodhes](https://github.com/leonardoMirabal/frodhes) by leonardoMirabal
 Frodhes is built on [Dinghy](https://github.com/zvenson/dinghy) by zvenson, which uses the platform of
 [Felucca](https://github.com/hugelton/Felucca) by Leo Kuroshita (Hügelton Instruments) as
 [SLOOP](https://github.com/isod89/sloop-fm1) by isod89 carries it. That platform handles updates, the USB rescue,
@@ -213,19 +219,19 @@ USB MIDI and audio, the panel, the screen and the settings. MIDI pitch bend is g
 ([PR #3](https://github.com/leonardoMirabal/frodhes/pull/3)). Key velocity on the FM-1's keys follows Charles
 Vestal's [fm1-velocity](https://github.com/charlesvestal/fm1-velocity).
 
+
+
 ## For developers
 
 How to build, test and contribute: [docs/BUILD.md](docs/BUILD.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Support
 
-Frodhes is free. If you enjoy it, you can [buy me a coffee](https://ko-fi.com/leomirabal).
+Frodhes-Bark is free. If you enjoy it, you can [buy the original developer a coffee](https://ko-fi.com/leomirabal).
 
 ## License and disclaimer
 
 GPL-3.0-only, the same as Dinghy, Felucca and SLOOP ([LICENSING.md](LICENSING.md)).
 
-Frodhes is an independent open-source project, not affiliated with or endorsed by M-VAVE,
-Ableton, the Rhodes or Fender trademark owners or any instrument maker. It comes with no warranty: install it at your own risk.
-
-You can also try Frodhes in the browser, no flashing needed, in the free community [FM-1 Emulator](https://fm1-emulator.atst.tools/).
+Frodhes-Bark is an independent open-source project, not affiliated with or endorsed by M-VAVE,
+the trademark owners of Rhodes, Fender, Wurlitzer or or any instrument maker. It comes with no warranty: install it at your own risk.
