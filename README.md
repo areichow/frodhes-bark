@@ -11,6 +11,16 @@ warm; play hard and it barks or rings.
 
 Frodhes is free. If you enjoy it, you can [buy the original developer a coffee](https://ko-fi.com/leomirabal).
 
+## See what's new
+
+<table align="center">
+  <tr>
+    <td align="center" width="50%"><img src="docs/manual/img/boot.png" width="100%" alt="FRODHES-BARK Boooting"><br>Frodhes-Bark Booting on the M-VAVE FM-1</td>
+    <td align="center" width="50%"><img src="docs/manual/img/velocity.png" width="100%" alt="Frodhes-Bark on the FM-1: Velocity Page"><br><b>Frodhes-Bark's new Velocity</td>
+  </tr>
+</table>
+
+<!-- original
 <table align="center">
   <tr>
     <td align="center" width="50%"><img src="docs/manual/img/piano.png?v=d41944c5" width="100%" alt="Frodhes on the FM-1: the FRODHES page, four cards for the four knobs"><br><b>On the M-VAVE FM-1</b>: colour screen, four knobs</td>
@@ -24,6 +34,7 @@ Frodhes is free. If you enjoy it, you can [buy the original developer a coffee](
 
 **[Try it in your browser](https://leonardomirabal.github.io/frodhes/)** before you install: the same firmware, with
 the FM-1's screen, knobs and keys. Play it from your computer keyboard or a MIDI keyboard.
+-->
 
 ## What you get
 
