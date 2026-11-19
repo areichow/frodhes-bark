@@ -43,6 +43,19 @@ typedef struct {              /* physical voicing per TYPE (params.json "types")
     uint8_t nbody, drive_row; /* body biquads in use (RH_BODY), the drive's row */
 } rh_type_t;
 #include "rhodes_tables.h"
+#include "wurli_tables.h"
+#define RH_TYPE_W140 4u
+#define RH_TYPE_W200 5u
+#define RH_NTYPE 6u
+#define WU_PZI(b, l) ((b) * WU_NLAYER + (l))
+static inline int rh_is_wurli(uint32_t ty) { return ty >= RH_TYPE_W140; }
+static inline uint32_t rh_wu_idx(uint32_t ty) { return (ty - RH_TYPE_W140) & 1u; }
+static inline const rh_type_t *rh_type_ptr(uint32_t ty) {
+    return rh_is_wurli(ty) ? &WU_TYPE[rh_wu_idx(ty)] : &RH_TYPE[ty & 3u];
+}
+static inline int32_t wu_clamp_u(int64_t u) {
+    return u > WU_U_MAX ? WU_U_MAX : u < -WU_U_MAX ? -WU_U_MAX : (int32_t)u;
+}
 #ifndef RH_NO_TONE_G                           /* (-DRH_NO_TONE_G: without it, as tools/tone_level.py measures) */
 #include "rh_tone_g.h"                         /* TONE's level compensation (tools/tone_level.py --write) */
 #if defined(RH_DRIVE) && defined(RH_VM_ON)
@@ -154,7 +167,7 @@ typedef struct {
                                                 * lag states */
     int32_t hd_a1, hd_a2;                      /* the two lags' coefficients per step (Q30) */
     uint16_t hd_n, hd_w;                       /* glide steps left (0: none), steps still to wait before it */
-    uint8_t hd_ph;                             /* sub-blocks to the next step (RH_HD_SUBS) */
+    uint8_t hd_ph, wu;                         /* sub-blocks to next step; wu: 1 = Wurlitzer voice */
 #ifdef RH_DRIVE
     /* S1a, the pickup drive (gen_rhodes.pickup_drive): pamp above is the excursion law's force (RH_PDRV), the one the
      * modes get; the physical hammer force (RH_PAMP) stays the measure of the note for the key-up noises and the thump
@@ -266,7 +279,7 @@ static uint32_t rh_mk_q12(const uint8_t *row, uint32_t vel)      /* Q12, < 2^16 
 /* the pickup drive's level make-up per TYPE, key and velocity: the drive's loudness back to the level the notes had
  * before it at mf and above, never under it (tools/drive_makeup.py). A gain on the voice's output only: the timbre
  * (the swing through the pickup) is the drive's. Note-on / re-strike only */
-#define rh_drv_mk(key, vel) rh_mk_q12(RH_DRV_MK[rh_type & 3u][key], vel)
+#define rh_drv_mk(key, vel) (rh_is_wurli(rh_type) ? 8192u : rh_mk_q12(RH_DRV_MK[rh_type & 3u][key], vel))
 /* the mechanical noises (knock, felt, pedal thud: absolute levels) follow the notes' level: the make-up brings the
  * notes back to the reference's level, the noises were set against, so they stay at their own (without it: RH_NZ_G,
  * the drive's gain target re the noises' reference, -6 dB; with it the pedal's thud played 6 dB under 0.9.9's) */
@@ -289,8 +302,10 @@ static uint32_t rh_mk_q12(const uint8_t *row, uint32_t vel)      /* Q12, < 2^16 
 #ifdef RH_TOP_Q
 static uint32_t rh_top_x(uint32_t key, uint32_t vel, uint32_t *g8)   /* the cut and the gain back, 1/256 octave */
 {
-    uint32_t r = RH_TOP_R[rh_type & 3u][key], span = RH_TOP_S[rh_type & 3u][key], g = RH_TOP_G[rh_type & 3u][key], u;
+    uint32_t r, span, g, u;
     *g8 = 0;
+    if (rh_is_wurli(rh_type)) return 0;
+    r = RH_TOP_R[rh_type & 3u][key]; span = RH_TOP_S[rh_type & 3u][key]; g = RH_TOP_G[rh_type & 3u][key];
     if (span) {                               /* above key 72: the ceiling's own span (1 .. 255 steps); its loudness
                                                * gain back on the square of the ramp (the fundamental's large-swing
                                                * part is lost only near v127; v64 keeps its level) */
@@ -662,8 +677,9 @@ static int32_t rh_dyn_gain(int32_t gain, uint32_t gd)       /* gain x gd (32768:
  * is small) is linear between anchors (tools/rhodes_model.py vgain: the same integers). Note-on / re-strike only */
 static int32_t rh_drive_g(uint32_t key, uint32_t vel, uint32_t lt)
 {
-    uint32_t i = RH_VPOS_I[vel], f = RH_VPOS_F[vel];
-    const uint16_t *pg = RH_PGF[key], *pd = RH_PDRV[key];
+    uint32_t i = RH_VPOS_I[vel], f = RH_VPOS_F[vel], wu = (uint32_t)rh_is_wurli(rh_type);
+    const uint16_t *pg = wu ? WU_PGF[WU_KEYS[key].band] : RH_PGF[key];
+    const uint16_t *pd = wu ? WU_PDRV[WU_KEYS[key].band] : RH_PDRV[key];
     int32_t q = (int32_t)pg[i] + ((((int32_t)pg[i + 1] - (int32_t)pg[i]) * (int32_t)f) >> 8);
     int32_t d = (int32_t)pd[i] + ((((int32_t)pd[i + 1] - (int32_t)pd[i]) * (int32_t)f) >> 8);
     uint32_t g = ((uint32_t)q << 15) / (uint32_t)(d < 1 ? 1 : d);   /* q < 2^16: 32-bit */
@@ -676,10 +692,11 @@ static int32_t rh_drive_g(uint32_t key, uint32_t vel, uint32_t lt)
 /* ---- voices (ISR) */
 #ifdef RH_DRIVE
 static int32_t rh_hermite(const int32_t *T, int64_t s);
-static int32_t rh_pd(uint32_t ki, uint32_t vel)        /* the drive's force at vel (RH_PDRV, interpolated) x the top */
+static int32_t rh_pd(uint32_t ki, uint32_t vel)        /* the drive's force at vel (RH_PDRV / WU_PDRV) x the top */
 {
     uint32_t i = RH_VPOS_I[vel], f = RH_VPOS_F[vel], t = rh_top_q12(ki, vel);
-    int32_t pd = (int32_t)RH_PDRV[ki][i] + ((((int32_t)RH_PDRV[ki][i + 1] - (int32_t)RH_PDRV[ki][i]) * (int32_t)f) >> 8);
+    const uint16_t *row = rh_is_wurli(rh_type) ? WU_PDRV[WU_KEYS[ki].band] : RH_PDRV[ki];
+    int32_t pd = (int32_t)row[i] + ((((int32_t)row[i + 1] - (int32_t)row[i]) * (int32_t)f) >> 8);
     return t >= 4096u ? pd : (int32_t)(((uint32_t)pd * t) >> 12);   /* (pd < 2^16) */
 }
 static int32_t rh_pdrv_at(uint32_t ki, uint32_t vel)   /* ... at least 16 (a ratio's divisor) */
@@ -693,17 +710,19 @@ static int32_t rh_pdrv_at(uint32_t ki, uint32_t vel)   /* ... at least 16 (a rat
 static void rh_drv_level(rh_voice_t *v, uint32_t ki, uint32_t vel)
 {
     const rh_key_t *k = v->k;
-    uint32_t kk = (uint32_t)(k->kill >> 3), q;
+    uint32_t kk = (uint32_t)((v->wu ? WU_KEYS[ki].kill : k->kill) >> 3), q;
     int32_t g = rh_drive_g(ki, vel, v->lt);
     v->gq = (uint16_t)g;
 #ifdef FR_HQ
-    hq_v[v - rv].dq = rh_dyn(ki + RH_KEY_LO, vel, v->lt);   /* (the live contact keeps the level map: hq_pulse_gain) */
+    if (!v->wu) hq_v[v - rv].dq = rh_dyn(ki + RH_KEY_LO, vel, v->lt);   /* (the live contact keeps the level map: hq_pulse_gain) */
 #endif
     {
         uint32_t i = RH_VPOS_I[vel], f = RH_VPOS_F[vel];
-        int32_t pa = (int32_t)RH_PAMP[ki][i] + ((((int32_t)RH_PAMP[ki][i + 1] - (int32_t)RH_PAMP[ki][i]) * (int32_t)f) >> 8);
+        const uint16_t *par = v->wu ? WU_PLEV[WU_KEYS[ki].band] : RH_PAMP[ki];
+        int32_t pa = (int32_t)par[i] + ((((int32_t)par[i + 1] - (int32_t)par[i]) * (int32_t)f) >> 8);
         int32_t pd = rh_pd(ki, vel);
-        uint64_t r = ((uint64_t)(((uint32_t)(pa < 1 ? 1 : pa) << 12) / (uint32_t)(pd < 1 ? 1 : pd)) * RH_DRV_IB[ki]) >> 12;
+        uint32_t ib = v->wu ? 4096u : (uint32_t)RH_DRV_IB[ki];
+        uint64_t r = ((uint64_t)(((uint32_t)(pa < 1 ? 1 : pa) << 12) / (uint32_t)(pd < 1 ? 1 : pd)) * ib) >> 12;
         v->pq = r > 0xFFFFFFu ? 0xFFFFFFu : (uint32_t)r;     /* (32-bit divide) */
     }
     v->gain = (int32_t)(((int64_t)v->gain0 * g) >> 16);
@@ -718,7 +737,7 @@ static void rh_drv_level(rh_voice_t *v, uint32_t ki, uint32_t vel)
     }
     v->okl = v->kl;
 #ifdef RH_TOP_Q
-    if (RH_TOP_S[rh_type & 3u][ki]) {   /* the ceiling above key 72 swings the tine up to 22.6 dB less and takes it back in
+    if (!v->wu && RH_TOP_S[rh_type & 3u][ki]) {   /* the ceiling above key 72 swings the tine up to 22.6 dB less and takes it back in
                                          * the output gain: the overtone modes (V2, O1, O2) sleep where they did before
                                          * that gain back (their state's few-LSB resting floor, 16-17 in the mode's units,
                                          * stayed over kl and played under the note as a steady -90 dBFS tone at the O1
@@ -740,7 +759,7 @@ static uint32_t rh_vel_old;                    /* a re-strike: the ringing strik
 static void rh_drv_restrike(rh_voice_t *v, uint32_t ki, uint32_t vel)
 {
 #ifndef RH_NO_HD
-    uint32_t go = (uint32_t)v->hd_g0;         /* (the glide's base: rh_hd_restrike puts the offset back to it) */
+    uint32_t go = (uint32_t)(v->wu ? v->gain : v->hd_g0);   /* (the glide's base: rh_hd_restrike puts the offset back to it) */
 #else
     uint32_t go = (uint32_t)v->gain;
 #endif
@@ -748,8 +767,7 @@ static void rh_drv_restrike(rh_voice_t *v, uint32_t ki, uint32_t vel)
     int64_t u = v->off;
     rh_drv_level(v, ki, vel);
 #ifdef FR_HQ
-    hq_v[v - rv].drl = hq_v[v - rv].dr;       /* the modes now hold this strike's units: the live force goes to them at its
-                                                * own physical-to-drive ratio (hq_pulse_gain: dr / drl = 1) */
+    if (!v->wu) hq_v[v - rv].drl = hq_v[v - rv].dr;
 #endif
     gn = (uint32_t)v->gain;
     if (go == gn || !gn) return;
@@ -768,57 +786,64 @@ static void rh_drv_restrike(rh_voice_t *v, uint32_t ki, uint32_t vel)
         u += s->x;
     }
     v->lvl = (int32_t)(((int64_t)v->lvl * r) >> 15); v->lvl0 = (int32_t)(((int64_t)v->lvl0 * r) >> 15);
-    if (u > 0x7FFFFFFF) u = 0x7FFFFFFF;
-    if (u < -0x7FFFFFFF) u = -0x7FFFFFFF;
-    v->Hprev = rh_hermite(RH_PU_PHIM(v->k->fam), u * u);
+    if (v->wu) {
+        int32_t uc = wu_clamp_u(u);
+        v->Hprev = rh_hermite(WU_PHIM, (int64_t)uc * uc);
+    } else {
+        if (u > 0x7FFFFFFF) u = 0x7FFFFFFF;
+        if (u < -0x7FFFFFFF) u = -0x7FFFFFFF;
+        v->Hprev = rh_hermite(RH_PU_PHIM(v->k->fam), u * u);
+    }
 #ifdef FR_HQ
-    hq_resync(v);                              /* (the exact pickup's flux from the scaled tip) */
+    if (!v->wu) hq_resync(v);                              /* (the exact pickup's flux from the scaled tip) */
 #endif
 }
 #endif
 static void rh_load_pulse(rh_voice_t *v, uint32_t vel, int fresh)   /* fresh: rh_init's (the drive's level just set) */
 {
     uint32_t key = (uint32_t)(v->k - RH_KEYS), i = RH_VPOS_I[vel], f = RH_VPOS_F[vel], l = RH_VLAY_I[vel];
-    const uint16_t *pa = RH_PAMP[key];
-    const uint16_t *pr = RH_PRATE[key];               /* (+ RH_PRATE_B[key]: the key's base) */
+    uint32_t wu = v->wu, wb = wu ? WU_KEYS[key].band : 0u;
+    const uint16_t *pr = wu ? WU_PRATE[wb] : RH_PRATE[key];
+    uint32_t prb = wu ? (uint32_t)WU_PRATE_B[wb] : (uint32_t)RH_PRATE_B[key];
     int32_t w = RH_VLAY_W[vel];
     (void)fresh;
-    FR_FAR2(rh_pz)(v->pbuf, &RH_PZB, RH_PZI(key, l));
-    if (w)          /* the layer crossfade, once per point (O2): the same integers the force loop computed per sample
-                     * (a + ((a2 - a) w >> 15), between a and a2: an int16), so the force is byte-identical */
-        FR_FAR2(rh_pz_mix)(v->pbuf, &RH_PZB, RH_PZI(key, l + 1u < RH_NLAYER ? l + 1u : RH_NLAYER - 1u), w);
+    if (wu) {
+        FR_FAR2(rh_pz)(v->pbuf, &WU_PZB, WU_PZI(wb, l));
+        if (w) FR_FAR2(rh_pz_mix)(v->pbuf, &WU_PZB, WU_PZI(wb, l + 1u < WU_NLAYER ? l + 1u : WU_NLAYER - 1u), w);
+    } else {
+        FR_FAR2(rh_pz)(v->pbuf, &RH_PZB, RH_PZI(key, l));
+        if (w) FR_FAR2(rh_pz_mix)(v->pbuf, &RH_PZB, RH_PZI(key, l + 1u < RH_NLAYER ? l + 1u : RH_NLAYER - 1u), w);
+    }
     v->ptab = v->pbuf;
-    v->atk = (uint16_t)(vel <= RH_ATK_V ? RH_ATK_A : (RH_ATK_A * (127u - vel)) / (127u - RH_ATK_V));   /* (each strike,
-                                                       * a re-strike too: the attack's lift, none at v127) */
-    v->pamp = (int32_t)pa[i] + ((((int32_t)pa[i + 1] - (int32_t)pa[i]) * (int32_t)f) >> 8);
+    v->atk = wu ? 0u : (uint16_t)(vel <= RH_ATK_V ? RH_ATK_A : (RH_ATK_A * (127u - vel)) / (127u - RH_ATK_V));
+    if (!wu) {
+        const uint16_t *pa = RH_PAMP[key];
+        v->pamp = (int32_t)pa[i] + ((((int32_t)pa[i + 1] - (int32_t)pa[i]) * (int32_t)f) >> 8);
+    }
 #ifdef RH_DRIVE
-    if (RH_IS_MAP(v)) v->pphys = v->pamp;             /* MAP: the physical force is the modes' force */
+    if (!wu && RH_IS_MAP(v)) v->pphys = v->pamp;             /* MAP: the physical force is the modes' force */
     else
     {   /* the note's level law (rh_left's measure of the note: the physical force was it before the drive), and the
          * excursion law's force for the modes (the same interpolation) */
-        const uint16_t *pl = RH_PLEV[key];
+        const uint16_t *pl = wu ? WU_PLEV[wb] : RH_PLEV[key];
         v->pphys = (int32_t)pl[i] + ((((int32_t)pl[i + 1] - (int32_t)pl[i]) * (int32_t)f) >> 8);
         v->pamp = rh_pd(key, vel);                    /* (the clean top's cut in it: rh_top_q12) */
     }
+#else
+    if (wu) {
+        const uint16_t *pa = WU_PAMP[wb];
+        v->pamp = (int32_t)pa[i] + ((((int32_t)pa[i + 1] - (int32_t)pa[i]) * (int32_t)f) >> 8);
+    }
 #endif
-    v->prate = (uint32_t)((int32_t)RH_PRATE_B[key] + pr[i] + ((((int32_t)pr[i + 1] - (int32_t)pr[i]) * (int32_t)f) >> 8)) << 4;  /* Q12 -> Q16 */
+    v->prate = (uint32_t)((int32_t)prb + pr[i] + ((((int32_t)pr[i + 1] - (int32_t)pr[i]) * (int32_t)f) >> 8)) << 4;  /* Q12 -> Q16 */
 #ifdef FR_HQ
-    hq_pulse(v, vel);
+    if (!wu) hq_pulse(v, vel);
 #endif
 #ifdef RH_DRIVE
-    if (!RH_IS_MAP(v) && fresh)                       /* the note-on: rh_drv_level has just set gq and mk from this
-                                                       * key, velocity and RESPONSE, so num == den below (the ratio
-                                                       * 1, exactly): only the range (the same integers, 0.9.12) */
+    if ((wu || !RH_IS_MAP(v)) && fresh)
         v->pamp = v->pamp > 65535 ? 65535 : v->pamp < 1 ? 1 : v->pamp;
-    else if (!RH_IS_MAP(v))
-    {   /* the drive. A harder re-strike takes its own level (rh_drv_restrike) and its full force. A softer one keeps the
-         * note-on's output gain (the tine still rings through it: a step would click), so the force takes the ratio of
-         * the gain law x the make-up, this velocity's over the note-on's, capped at 1 as a product (either alone may
-         * pass 1); before the HAMMER scaling and the HQ live force, which cap it. Never above 1: a softer strike of a
-         * note ringing from a harder one (E2 v110 -> v64) took the force up by the gain law's ratio and swung the tine
-         * past a fresh strike's, a burst of bark (+25 dB > 5 kHz, the pedal down); capped, it plays at its own swing,
-         * under the ringing note's gain. At the note-on the ratio is 1, exactly. num / den: Q16 x Q12, under 2^36
-         * (the make-up < 2^20 with the clean top's gain back), scaled down to 15 bits for the 32-bit divide */
+    else if (wu || !RH_IS_MAP(v))
+    {
         uint64_t num = (uint64_t)rh_drive_g(key, vel, v->lt) * rh_drv_mkt(key, vel), den = (uint64_t)v->gq * v->mk;
         uint32_t sh;
         int32_t a = (int32_t)v->pamp;
@@ -826,19 +851,19 @@ static void rh_load_pulse(rh_voice_t *v, uint32_t vel, int fresh)   /* fresh: rh
         else if (num < den && den) {
             uint32_t hi = (uint32_t)(den >> 32);
             sh = hi ? 49u - (uint32_t)__builtin_clz(hi)
-                    : den >= 32768u ? 17u - (uint32_t)__builtin_clz((uint32_t)den) : 0u;   /* den >> sh in [2^14, 2^15) */
-            a = (int32_t)(((uint32_t)v->pamp * (uint32_t)(num >> sh)) / (uint32_t)(den >> sh));   /* < 2^16 x 2^15 */
+                    : den >= 32768u ? 17u - (uint32_t)__builtin_clz((uint32_t)den) : 0u;
+            a = (int32_t)(((uint32_t)v->pamp * (uint32_t)(num >> sh)) / (uint32_t)(den >> sh));
         }
-        v->pamp = a > 65535 ? 65535 : a < 1 ? 1 : a;   /* mul15s: 32767 x 65535 < 2^31 (gen_rhodes: the headroom) */
+        v->pamp = a > 65535 ? 65535 : a < 1 ? 1 : a;
     }
 #endif
     {   /* HAMMER knob x TYPE tips scale the contact rate; the force scales with it so the impulse (the hammer's
          * momentum) is kept: a softer tip pushes longer and less hard, it does not give more energy */
-        uint32_t h = (uint32_t)(((uint64_t)(uint32_t)rh_ham * (uint32_t)RH_TYPE[rh_type & 3u].ham) >> 16);
+        uint32_t h = (uint32_t)(((uint64_t)(uint32_t)rh_ham * (uint32_t)rh_type_ptr(rh_type)->ham) >> 16);
         v->prate = (uint32_t)(((uint64_t)v->prate * h) >> 16);
         v->pamp = (int32_t)(((int64_t)v->pamp * h) >> 16);
 #ifdef RH_DRIVE
-        if (!RH_IS_MAP(v)) { if (v->pamp > 65535) v->pamp = 65535; }
+        if (wu || !RH_IS_MAP(v)) { if (v->pamp > 65535) v->pamp = 65535; }
         else
 #endif
         if (v->pamp > 32767) v->pamp = 32767;
@@ -848,7 +873,7 @@ static void rh_load_pulse(rh_voice_t *v, uint32_t vel, int fresh)   /* fresh: rh
 #endif
     }
 #ifdef FR_HQ
-    hq_pulse_gain(v);
+    if (!wu) hq_pulse_gain(v);
 #endif
     v->ppos = 0;
 #ifdef DINGHY_PLUGIN
@@ -1381,22 +1406,50 @@ static void rh_vm_kap(rh_voice_t *v, uint32_t n, const rh_type_t *ty, int32_t vx
 #endif
 static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
 {
-    const rh_type_t *ty = &RH_TYPE[rh_type];
+    uint32_t wu = (uint32_t)rh_is_wurli(rh_type);
+    const rh_type_t *ty = rh_type_ptr(rh_type);
     uint32_t m, n = note < RH_KEY_LO ? RH_KEY_LO : note > RH_KEY_LO + RH_NKEY - 1u ? RH_KEY_LO + RH_NKEY - 1u : note;
-    const rh_key_t *k = &RH_KEYS[n - RH_KEY_LO];
+    uint32_t ki = n - RH_KEY_LO;
+    const rh_key_t *k = &RH_KEYS[ki];
     int32_t u, t = rh_tune_now(), bell = rh_bell_at(n);
     uint32_t cp = rh_cc_pub;                    /* the cache, if it holds this note-on's coefficients */
-    const rh_cc_t *cc = cp && rh_cc_st[cp - 1u][0] == t && rh_cc_st[cp - 1u][1] == rh_k_decay
-                        && rh_cc_st[cp - 1u][2] == rh_k_rel ? rh_cc[cp - 1u][n - RH_KEY_LO] : 0;
+    const rh_cc_t *cc = !wu && cp && rh_cc_st[cp - 1u][0] == t && rh_cc_st[cp - 1u][1] == rh_k_decay
+                        && rh_cc_st[cp - 1u][2] == rh_k_rel ? rh_cc[cp - 1u][ki] : 0;
 #ifdef RH_VMAP
     int32_t vx = RH_VM_ONE, vg = RH_VM_ONE;
-    v->vm = (uint8_t)(rh_touch_mode != 0);
-    if (v->vm) { vx = rh_vm(0u, n - RH_KEY_LO, vel); vg = rh_vm_g(n - RH_KEY_LO, vel); }   /* MAP: X, G x rh_dyn (Q11) */
+    v->vm = (uint8_t)(!wu && rh_touch_mode != 0);
+    if (v->vm) { vx = rh_vm(0u, ki, vel); vg = rh_vm_g(ki, vel); }   /* MAP: X, G x rh_dyn (Q11) */
 #endif
-    v->k = k; v->tn = rh_tune_t;
+    v->k = k; v->tn = rh_tune_t; v->wu = (uint8_t)wu;
 #if defined(DINGHY_HOST) && !defined(DINGHY_WEB)
     v->tb = rh_bend_t;
 #endif
+    if (wu) {
+        const wu_key_t *wk = &WU_KEYS[ki];
+        for (m = 0; m < RH_NM; m++) {
+            rh_ms_t *s = &v->m[m];
+            s->x = s->y = s->ex = s->ey = s->peak = s->e = s->eps = s->kap = 0;
+            s->live = 0;
+        }
+        {   /* Mode 0 (V1): share sh/ch/th/cr with RH_KEYS[ki].m[0] at exact 12-TET f0 */
+            rh_ms_t *s = &v->m[0];
+            int64_t b = ((((int64_t)wk->b * rh_bark_s) >> 16) * ty->bark) >> 16;
+            rh_coef(&k->m[0], wk->d, t, rh_k_decay, &s->e0, &s->eps0);
+            rh_coef(&k->m[0], wk->drel, t, rh_k_rel, &s->e1, &s->eps1);
+            s->e = s->es = s->e0; s->eps = s->epss = s->eps0;
+            s->b = b > 0x7FFFFFFF ? 0x7FFFFFFF : b < -0x7FFFFFFF ? -0x7FFFFFFF : (int32_t)b;
+            s->live = 1;
+        }
+        if (wk->o1.th) {   /* Mode 1 (O1): reed overtone/clank */
+            rh_ms_t *s = &v->m[1];
+            int64_t b = ((((((int64_t)wk->o1.b * rh_bark_s) >> 16) * ty->bark) >> 16) * ty->bell >> 16) * bell >> 16;
+            rh_coef(&wk->o1, wk->o1.d, t, rh_k_decay, &s->e0, &s->eps0);
+            rh_coef(&wk->o1, wk->o1.drel, t, rh_k_rel, &s->e1, &s->eps1);
+            s->e = s->es = s->e0; s->eps = s->epss = s->eps0;
+            s->b = b > 0x7FFFFFFF ? 0x7FFFFFFF : b < -0x7FFFFFFF ? -0x7FFFFFFF : (int32_t)b;
+            s->live = 1;
+        }
+    } else
     for (m = 0; m < RH_NM; m++) {
         rh_ms_t *s = &v->m[m];
         const rh_mode_t *km = &k->m[m];
@@ -1411,7 +1464,7 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
         }
         s->e = s->es = s->e0; s->eps = s->epss = s->eps0;
 #ifdef RH_VMAP
-        if (v->vm) { s->b = rh_vm_b(km, m, ty, n - RH_KEY_LO, vx); continue; }   /* MAP: the map's swing */
+        if (v->vm) { s->b = rh_vm_b(km, m, ty, ki, vx); continue; }   /* MAP: the map's swing */
 #endif
         {   /* force gain: BARK scales the tip (the pickup then barks), BELL the overtones; saturating */
             int64_t b = ((((int64_t)km->b * rh_bark_s) >> 16) * ty->bark) >> 16;
@@ -1424,7 +1477,11 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
         int32_t p = rh_spread ? ((2 * (int32_t)note - 129) * rh_spread * 256) / (87 * 127) : 0;
         v->pan = p > 256 ? 256 : p < -256 ? -256 : p;
     }
-    {   /* TYPE, TONE and the cap are distances: in the 1/16" family's own gap (twice the 1/32") half as many (S8) */
+    if (wu) {
+        const wu_key_t *wk = &WU_KEYS[ki];
+        v->off = wu_clamp_u((int64_t)wk->off + ty->off_delta + rh_tone_off);
+        v->gain = mul16(mul16(wk->gain, rh_bark_g), ty->bark_g);
+    } else {   /* TYPE, TONE and the cap are distances: in the 1/16" family's own gap (twice the 1/32") half as many (S8) */
         uint32_t sh = RH_FAM_SH[k->fam];
         int32_t mx = RH_OFF_MAX >> sh;
         v->off = k->off + ((ty->off_delta + rh_tone_off) >> sh);
@@ -1434,7 +1491,7 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
         if (rh_tone_off > 0) {                         /* TONE above 64: its loudness back (the offsets in the family's
                                                         * own gap, the family's own curve: S8) */
             int32_t o64 = k->off + (ty->off_delta >> sh);
-            v->gain = rh_tone_gain(v->gain, o64 > mx ? mx : o64, v->off, vel, k->fam, n - RH_KEY_LO, RH_IS_MAP(v));
+            v->gain = rh_tone_gain(v->gain, o64 > mx ? mx : o64, v->off, vel, k->fam, ki, RH_IS_MAP(v));
         }
 #endif
     }
@@ -1443,37 +1500,46 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
     else
 #endif
 #ifdef RH_DRIVE
-    { v->gain0 = v->gain; v->lt = (uint8_t)(rh_touch_mode != 0); rh_drv_level(v, n - RH_KEY_LO, vel); }   /* the drive: the gain law, the make-up, the kill */
+    { v->gain0 = v->gain; v->lt = (uint8_t)(rh_touch_mode != 0); rh_drv_level(v, ki, vel); }   /* the drive: the gain law, the make-up, the kill */
 #endif
     u = v->off;
-    v->Hprev = rh_hermite(RH_PU_PHIM(k->fam), (int64_t)u * u);
+    v->Hprev = rh_hermite(wu ? WU_PHIM : RH_PU_PHIM(k->fam), (int64_t)u * u);
     v->alive = 1; v->held = 1; v->ramp = 0; v->w_tgt = 0;
     v->fade = 32768; v->pend = 0; v->felt_n = 0; v->felt_lp = 0;
     v->age = ++rh_ages;
-    v->life = k->life;
+    v->life = wu ? WU_KEYS[ki].life : k->life;
     v->m[RH_V1].kap = 0;
 #ifdef FR_HQ
-    hq_voice_init(v);
+    if (wu) { hq_v[v - rv].os = 0; hq_v[v - rv].ex = 0; }
+    else hq_voice_init(v);
 #endif
 #ifndef RH_NO_S4                                          /* -DRH_NO_S4: without it (the A/B reference) */
-    if (n < RH_KAP_HI) {                                  /* S4: kap / (BARK x the TYPE's bark)^2 */
+    if (wu) {
+        if (n < WU_KAP_HI) {                              /* Wurlitzer negative attack pitch dip: -kap / (BARK x ty->bark)^2 */
+            uint32_t g = (uint32_t)(((uint64_t)(uint32_t)rh_bark_s * (uint32_t)ty->bark) >> 16), ig;
+            if (g < 4096u) g = 4096u;
+            ig = 0x80000000u / g;
+            v->m[RH_V1].kap = -(int32_t)(((uint64_t)WU_KAP[ki] * ig * ig) >> 30);
+        }
+    } else if (n < RH_KAP_HI) {                           /* S4: kap / (BARK x the TYPE's bark)^2 */
         uint32_t g = (uint32_t)(((uint64_t)(uint32_t)rh_bark_s * (uint32_t)ty->bark) >> 16), ig;
 #ifdef RH_VMAP
         if (v->vm) g = (uint32_t)(((uint64_t)g * (uint32_t)vx) >> RH_VM_Q);   /* MAP: / its swing X too */
 #endif
         if (g < 4096u) g = 4096u;
         ig = 0x80000000u / g;                             /* 1 / g, Q15 (g Q16) */
-        v->m[RH_V1].kap = (int32_t)(((uint64_t)RH_KAP[n - RH_KEY_LO] * ig * ig) >> 30);
+        v->m[RH_V1].kap = (int32_t)(((uint64_t)RH_KAP[ki] * ig * ig) >> 30);
         v->m[RH_V1].kap <<= 2u * RH_FAM_SH[k->fam];      /* S8: the 1/16" family's x is in its own (double) gap, so
                                                            * the same swing is half the x: kap x 4 keeps the offset */
 #ifdef RH_DRIVE
         if (!RH_IS_MAP(v))
-            v->m[RH_V1].kap = (int32_t)(((uint64_t)(uint32_t)v->m[RH_V1].kap * RH_KAP_X[n - RH_KEY_LO]) >> 16);   /* the
+            v->m[RH_V1].kap = (int32_t)(((uint64_t)(uint32_t)v->m[RH_V1].kap * RH_KAP_X[ki]) >> 16);   /* the
                                                            * drive's swing at v127 is m127 x the physical one */
 #endif
     }
 #endif
-    rh_hd_init(v, n, vel);
+    if (wu) { v->hd_n = 0; v->hd_w = 0; v->hd_g0 = v->gain; }
+    else rh_hd_init(v, n, vel);
     rh_load_pulse(v, vel, 1);
 }
 
@@ -1535,7 +1601,7 @@ static void __attribute__((noinline)) rh_knock_strike(uint32_t note, uint32_t ve
 {
     uint32_t n, key, i, f, l, h, prate;
     int32_t pamp, a;
-    if (!rh_knock || !RH_KNOCK_ON[rh_type & 3u]) return;
+    if (!rh_knock || rh_is_wurli(rh_type) || !RH_KNOCK_ON[rh_type & 3u]) return;
     if (rh_kn_tab && rh_kn_pos) return;                 /* a knock from an earlier block still sounds */
     n = note < RH_KEY_LO ? RH_KEY_LO : note > RH_KEY_LO + RH_NKEY - 1u ? RH_KEY_LO + RH_NKEY - 1u : note;
     key = n - RH_KEY_LO; i = RH_VPOS_I[vel]; f = RH_VPOS_F[vel];
@@ -1600,11 +1666,18 @@ static int rh_strike(uint32_t note, uint32_t vel)      /* 0: every voice already
 #endif
     rh_knock_strike(note, vel);
     for (i = 0; i < RH_NV; i++)                         /* the same note still sounding: re-strike, superpose */
-        if (rv[i].alive && !rv[i].pend && rv[i].note == note && rv[i].fade == 32768) {
+        if (rv[i].alive && !rv[i].pend && rv[i].note == note && rv[i].fade == 32768 && rv[i].wu == (uint8_t)rh_is_wurli(rh_type)) {
             rh_voice_t *v = &rv[i];
-            uint32_t m, vo = v->vel;                    /* (the old strike's velocity: rh_vm_restrike) */
-            for (m = 0; m < RH_NM; m++) if (rh_mode_runs(v->k, m)) v->m[m].live = 1;
-            v->vel = (uint8_t)vel; v->held = 1; v->age = ++rh_ages; v->life = v->k->life; v->lvl0 = v->lvl;
+            uint32_t m, vo = v->vel, ki = (uint32_t)(v->k - RH_KEYS);
+            if (v->wu) {
+                v->m[0].live = 1;
+                if (WU_KEYS[ki].o1.th) v->m[1].live = 1;
+                v->life = WU_KEYS[ki].life;
+            } else {
+                for (m = 0; m < RH_NM; m++) if (rh_mode_runs(v->k, m)) v->m[m].live = 1;
+                v->life = v->k->life;
+            }
+            v->vel = (uint8_t)vel; v->held = 1; v->age = ++rh_ages; v->lvl0 = v->lvl;
             rh_set_damper_n(v, 0, 1);                   /* the felt off at once: the damper lifts as the key goes
                                                          * down, before the hammer arrives (a ramp under the strike
                                                          * stepped the modes' coefficients each sub-block while the
@@ -1621,7 +1694,7 @@ static int rh_strike(uint32_t note, uint32_t vel)      /* 0: every voice already
 #else
             (void)vo;
 #endif
-            rh_hd_restrike(v, vel);                     /* (after the map's gain: the glide's base) */
+            if (!v->wu) rh_hd_restrike(v, vel);         /* (after the map's gain: the glide's base) */
             return 1;
         }
     for (i = 0; i < RH_NA; i++)
@@ -1675,7 +1748,14 @@ static void rh_events(void)                     /* the block's start (rh_render,
                         rh_h_kth = th;
 #endif
                         kn = 1;
-                        v->ptab = FR_FAR2(rh_pz)(v->pbuf, &RH_PZB, RH_PZI(key, 0));
+                        if (v->wu) {
+                            uint32_t wb = WU_KEYS[key].band;
+                            v->ptab = FR_FAR2(rh_pz)(v->pbuf, &WU_PZB, WU_PZI(wb, 0));
+                            v->prate = (uint32_t)(WU_PRATE_B[wb] + WU_PRATE[wb][1]) << 4;
+                        } else {
+                            v->ptab = FR_FAR2(rh_pz)(v->pbuf, &RH_PZB, RH_PZI(key, 0));
+                            v->prate = (uint32_t)(RH_PRATE_B[key] + RH_PRATE[key][1]) << 4;
+                        }
 #ifdef RH_DRIVE
                         {   /* th is a physical force: the modes get it at the strike's drive ratio (pamp / pphys) */
                             int32_t pp = v->pphys < 1 ? 1 : v->pphys, a;
@@ -1686,7 +1766,6 @@ static void rh_events(void)                     /* the block's start (rh_render,
                         }
 #endif
                         v->pamp = th > 32767 ? 32767 : th;
-                        v->prate = (uint32_t)(RH_PRATE_B[key] + RH_PRATE[key][1]) << 4;
                         v->ppos = 0;
 #ifdef DINGHY_PLUGIN
                         v->pdly = 0;
@@ -1848,8 +1927,9 @@ static inline __attribute__((always_inline)) int32_t rh_s4_e(const rh_ms_t *s)
 #else
     if (a2 > Q30) a2 = Q30;
 #endif
-    f = (a2 * s->kap) >> 16;                              /* the fraction, Q30: at most 1/16 (a guard: ~6 c here) */
+    f = (a2 * s->kap) >> 16;                              /* the fraction, Q30: at most +-1/16 */
     if (f > (Q30 >> 4)) f = Q30 >> 4;
+    else if (f < -(Q30 >> 4)) f = -(Q30 >> 4);
     return s->e + (int32_t)(((int64_t)s->e * f) >> 30);
 }
 static FR_RAM int32_t __attribute__((noinline)) rh_mode_f1_l(rh_ms_t *s) { return rh_mode_f_t(s, 1); }
@@ -1972,21 +2052,29 @@ FR_RAM2 static __attribute__((noinline)) void rh_voice_sub(rh_voice_t *v, int32_
             if (v->m[m].live) sum += fnz ? FR_FAR(rh_mode_f)(&v->m[m]) : FR_FAR(rh_mode_p)(&v->m[m]);
     }
 #ifdef FR_HQ
-    if (hq_v[v - rv].os) Hp = hq_pickup(v, mix, side, Hp, gain); else   /* (gain: with the lift) */
-    if (hq_v[v - rv].ex) hq_pickup1(v, mix, side, gain); else        /* (the exact flux at 1x: Hp unused) */
+    if (!v->wu && hq_v[v - rv].os) Hp = hq_pickup(v, mix, side, Hp, gain); else   /* (gain: with the lift) */
+    if (!v->wu && hq_v[v - rv].ex) hq_pickup1(v, mix, side, gain); else           /* (the exact flux at 1x: Hp unused) */
 #endif
-    if (v->fade == 32768) {                               /* pickup, then the per-key gain into the mix: no steal fade
-                                                           * (only this loop changes it in a render: the test below would
-                                                           * never fire); with a stereo position (SPREAD) also into side */
-        if (!v->pan) Hp = FR_FAR(rh_pickup)(RH_PU_PHIM(k->fam), mix, off, Hp, gain);
-        else Hp = FR_FAR(rh_pickup_s)(RH_PU_PHIM(k->fam), mix, side, off, Hp, gain, v->pan);
-    } else if (!v->pan)
-        Hp = FR_FAR(rh_pickup_fx)(v, RH_PU_PHIM(k->fam), mix, off, Hp, gain);
-    else {                                                /* (a steal fade with a position: rare) */
-        int32_t tmp[SUB], p = v->pan;
-        for (j = 0; j < SUB; j++) tmp[j] = 0;
-        Hp = FR_FAR(rh_pickup_fx)(v, RH_PU_PHIM(k->fam), tmp, off, Hp, gain);
-        for (j = 0; j < SUB; j++) { mix[j] += tmp[j]; side[j] += (tmp[j] * p) >> 8; }
+    {
+        const int32_t *phim = v->wu ? WU_PHIM : RH_PU_PHIM(k->fam);
+        if (v->wu) {
+            int32_t lo = -WU_U_MAX - off, hi = WU_U_MAX - off;
+            for (j = 0; j < SUB; j++) {
+                int32_t x = rh_x[j];
+                if (x > hi) rh_x[j] = hi; else if (x < lo) rh_x[j] = lo;
+            }
+        }
+        if (v->fade == 32768) {
+            if (!v->pan) Hp = FR_FAR(rh_pickup)(phim, mix, off, Hp, gain);
+            else Hp = FR_FAR(rh_pickup_s)(phim, mix, side, off, Hp, gain, v->pan);
+        } else if (!v->pan)
+            Hp = FR_FAR(rh_pickup_fx)(v, phim, mix, off, Hp, gain);
+        else {                                            /* (a steal fade with a position: rare) */
+            int32_t tmp[SUB], p = v->pan;
+            for (j = 0; j < SUB; j++) tmp[j] = 0;
+            Hp = FR_FAR(rh_pickup_fx)(v, phim, tmp, off, Hp, gain);
+            for (j = 0; j < SUB; j++) { mix[j] += tmp[j]; side[j] += (tmp[j] * p) >> 8; }
+        }
     }
     if (v->felt_n) {                                      /* felt noise after a key-up: LFSR, one-pole ~2 kHz, added in
                                                            * a pass of its own (O6; it was a branch in the fade loop):
@@ -2083,10 +2171,17 @@ static void __attribute__((noinline)) rh_retune(void)
 #endif
         for (m = 0; m < RH_NM; m++) {
             rh_ms_t *s = &v->m[m];
-            const rh_mode_t *km = &v->k->m[m];
+            const rh_mode_t *km;
             int32_t sp;
             int64_t cr;
-            if (!rh_mode_runs(v->k, m)) continue;
+            if (v->wu) {
+                if (m >= 2u) continue;
+                km = m == 0u ? &v->k->m[0] : &WU_KEYS[(uint32_t)(v->k - RH_KEYS)].o1;
+                if (!km->th) continue;
+            } else {
+                km = &v->k->m[m];
+                if (!rh_mode_runs(v->k, m)) continue;
+            }
             cr = rh_coef_tune(km, t, &sp);                 /* rh_coef's integers: the tuning part once for both decays,
                                                             * eps the note-on's */
             s->e0 = rh_coef_e(s->eps0, sp, cr);
@@ -2232,7 +2327,7 @@ static int rh_chain_zero(void)
 }
 static uint32_t rh_txf_type(void)                         /* the TYPE the filters run this block */
 {
-    uint32_t want = rh_type & 3u;
+    uint32_t want = rh_type < RH_NTYPE ? (uint32_t)rh_type : 0u;
     if (want != rh_txf.run && !rh_txf.n) {
         if (rh_chain_zero()) rh_txf.run = (uint8_t)want;
         else { memset(rh_txf.st, 0, sizeof rh_txf.st); memset(rh_txf.ss, 0, sizeof rh_txf.ss); rh_txf.ty = (uint8_t)want; rh_txf.n = RH_TXF_BLK; }
@@ -2242,13 +2337,15 @@ static uint32_t rh_txf_type(void)                         /* the TYPE the filter
 /* TYPE t's chain: in -> x (the side: x in place, its last stage rounding to Q15), from st (RLC, the body biquads) */
 static __attribute__((noinline)) void rh_chain(int32_t *x, const int32_t *in, uint32_t n, int32_t (*st)[5], int side, uint32_t t)
 {
-    uint32_t nb = RH_TYPE[t].nbody, sb;
-    if (!side) FR_FAR2(rh_df1)(in, x, n, RH_RLC[t], st[0]);
-    else if (nb) FR_FAR(rh_df1_s)(x, n, RH_RLC[t], st[0]); else FR_FAR(rh_df1_sq)(x, n, RH_RLC[t], st[0]);
+    const int32_t *rlc = rh_is_wurli(t) ? WU_RLC[rh_wu_idx(t)] : RH_RLC[t & 3u];
+    const int32_t (*body)[5] = rh_is_wurli(t) ? WU_BODY[rh_wu_idx(t)] : RH_BODY[t & 3u];
+    uint32_t nb = rh_type_ptr(t)->nbody, sb;
+    if (!side) FR_FAR2(rh_df1)(in, x, n, rlc, st[0]);
+    else if (nb) FR_FAR(rh_df1_s)(x, n, rlc, st[0]); else FR_FAR(rh_df1_sq)(x, n, rlc, st[0]);
     for (sb = 0; sb < nb; sb++)
-        if (!side) FR_FAR2(rh_df1)(x, x, n, RH_BODY[t][sb], st[1u + sb]);
-        else if (sb + 1u < nb) FR_FAR(rh_df1_s)(x, n, RH_BODY[t][sb], st[1u + sb]);
-        else FR_FAR(rh_df1_sq)(x, n, RH_BODY[t][sb], st[1u + sb]);
+        if (!side) FR_FAR2(rh_df1)(x, x, n, body[sb], st[1u + sb]);
+        else if (sb + 1u < nb) FR_FAR(rh_df1_s)(x, n, body[sb], st[1u + sb]);
+        else FR_FAR(rh_df1_sq)(x, n, body[sb], st[1u + sb]);
 }
 static void rh_txf_blend(int32_t *x, const int32_t *nw, uint32_t n)   /* x = old + (new - old) w, w rising */
 {

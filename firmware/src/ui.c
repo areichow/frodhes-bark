@@ -1139,10 +1139,11 @@ FR_COLD static void draw_row(uint32_t k)
 #define CD_LED_GAP 8
 #define CD_KTAG_TOP S_TOP(9)
 /* the short forms, used only where the long one does not fit (at 28 px: TYPE 143 px, ASSIGN PLAYS 136; fewer at 25 / 24) */
-static const char *const CD_LONG[] = {"EARLY FELT", "BELL DYNO", "TREM/WAH", "COMP THR", "COMP MKUP", "TREM RATE",
-                                      "TREM SHAPE", "PHA SPEED", "PHA FEEDBK", "CHO SPEED", "DLY FEEDBK"};
-static const char *const CD_SHORT[] = {"FELT", "DYNO", "TRM/WAH", "CMP THR", "CMP GAIN", "TRM RATE", "TRM SHP",
-                                       "PHA SPD", "PHA FDBK", "CHO SPD", "DLY FDBK"};
+static const char *const CD_LONG[] = {"EARLY FELT", "BELL DYNO", "WURLI 140B", "WURLI 200A", "TREM/WAH", "COMP THR",
+                                      "COMP MKUP", "TREM RATE", "TREM SHAPE", "PHA SPEED", "PHA FEEDBK", "CHO SPEED",
+                                      "DLY FEEDBK"};
+static const char *const CD_SHORT[] = {"FELT", "DYNO", "W140", "W200", "TRM/WAH", "CMP THR", "CMP GAIN", "TRM RATE",
+                                       "TRM SHP", "PHA SPD", "PHA FDBK", "CHO SPD", "DLY FDBK"};
 _Static_assert(sizeof CD_LONG == sizeof CD_SHORT, "one short form per long one");
 FR_COLD static int cd_eq(const char *a, const char *b) { while (*a && *a == *b) { a++; b++; } return *a == *b; }
 /* the value's text, its unit apart (slot_unit, and a number's "%"); 0: none */

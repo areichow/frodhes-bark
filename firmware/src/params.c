@@ -40,19 +40,22 @@ typedef struct {
     const char *const *names; /* F_ENUM */
 } pdesc_t;
 
-static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB"};
-static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA"};
-/* TYPE -> engine (0 Rhodes, 1 bars), the engine's own type index, and the drive row (fx.c, 0..3). Append-only, in
- * step with N_TYPE. The Rhodes types 0..3 are unchanged; VIBES (4) is the first bar type, MARIMBA (5) the second
- * (bars.c BAR_TYPE[1]). TYPE_FLAGS: what the instrument has, as the bar type record's flags (bars.h bar_type_t):
+enum { T_ST77, T_SUIT, T_FELT, T_DYNO, T_VIBE, T_MRMB, T_W140, T_W200 };
+static const char *const N_TYPE[] = {"ST77", "SUIT", "FELT", "DYNO", "VIBE", "MRMB", "W140", "W200"};
+static const char *const N_TYPE_LONG[] = {"STAGE 77", "SUITCASE", "EARLY FELT", "BELL DYNO", "VIBES", "MARIMBA",
+                                          "WURLI 140B", "WURLI 200A"};
+/* TYPE -> engine (0 Rhodes/Wurli, 1 bars), the engine's own type index, and the drive row (fx.c, 0..3). Append-only, in
+ * step with N_TYPE. The Rhodes types 0..3 are unchanged; VIBES (4), MARIMBA (5) are bars; W140 (6), W200 (7) are
+ * Wurlitzer 140B & 200A routed through rhodes.c (RH_TYPE_W140 = 4, RH_TYPE_W200 = 5). TYPE_FLAGS: what the instrument
+ * has, as the bar type record's flags (bars.h bar_type_t):
  * bit0 a motor (the MOTOR controls and their auto-on), bit1 a damper (key-up damps; without one DECAY's second card
  * is MUTE, the player's hand: 0 = rings out). */
-#define N_TYPE_N 6u
-static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1};
-static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1};
-static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0};
-static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0};
-static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96};   /* the bar types' CC 79 band starts, rising in TYPE
+#define N_TYPE_N 8u
+static const uint8_t TYPE_ENGINE[N_TYPE_N] = {0, 0, 0, 0, 1, 1, 0, 0};
+static const uint8_t TYPE_SUB[N_TYPE_N] = {0, 1, 2, 3, 0, 1, 4, 5};
+static const uint8_t TYPE_DRIVE_ROW[N_TYPE_N] = {0, 1, 2, 3, 0, 0, 1, 0};
+static const uint8_t TYPE_FLAGS[N_TYPE_N] = {0, 0, 0, 0, 3, 0, 0, 0};
+static const uint8_t TYPE_CC79[N_TYPE_N] = {0, 0, 0, 0, 0, 96, 0, 0};   /* the bar types' CC 79 band starts, rising in TYPE
                                     * order (frodhes.c midi_cc): VIBES 0..95, MARIMBA 96..127 (the Rhodes: CC 80) */
 _Static_assert(sizeof N_TYPE / sizeof N_TYPE[0] == N_TYPE_N && sizeof N_TYPE_LONG / sizeof N_TYPE_LONG[0] == N_TYPE_N,
                "one name per TYPE");
@@ -98,7 +101,7 @@ static const char *const N_SYNC[] = {"FREE", "1/32", "16T", "1/16", "8T", "16D",
                                      "1/1", "2BAR", "4BAR"};
 
 static const pdesc_t PARAMS[P_COUNT] = {
-    [P_TYPE] = {"TYPE", 5, 0, F_ENUM, 80, N_TYPE},
+    [P_TYPE] = {"TYPE", 7, 0, F_ENUM, 80, N_TYPE},
     [P_DRIVE] = {"DRV", 127, 0, F_R10, 81, 0},
     [P_TW_SW] = {"TREM", 2, 0, F_ENUM, 17, N_TW},
     [P_TW_DEPTH] = {"DPTH", 127, 0, F_R10, 18, 0},

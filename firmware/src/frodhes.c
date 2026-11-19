@@ -1488,6 +1488,13 @@ FR_COLD static void midi_cc(uint32_t cc, uint32_t v)
         ui_mark(E_CARDS); ui_mark(E_FOOTER);
         return;
     }
+    if (cc == 33u) {                                   /* direct TYPE select: 0..7 direct, or 0..127 across all 8 types
+                                                        * (CC 41 is KV_CC_MODE in keyvel.h; CC 79 = bars; CC 80 = Rhodes) */
+        uint32_t pick = v < N_TYPE_N ? v : (v * N_TYPE_N) >> 7;
+        type_pick((int32_t)pick);
+        ui_mark_param(P_TYPE);
+        return;
+    }
     if (cc == 79u) {                                   /* the bar types: each TYPE of the bar engine (TYPE_ENGINE 1) from
                                                         * its TYPE_CC79 value up to the next one's: VIBES 0..95 (every
                                                         * value 0.9.3 used for it up to 95, 0 and 64 included), MARIMBA

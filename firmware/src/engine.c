@@ -102,7 +102,14 @@ static void eng_set_type(uint32_t t)
 {
     uint8_t w = eng_want, s = eng_want_sub;
     if (t < ENG_RH_NTYPE) { rh_type = (uint8_t)t; eng_want = ENG_RHODES; }
-    else { t -= ENG_RH_NTYPE; eng_want_sub = (uint8_t)(t < BAR_NTYPE ? t : 0u); eng_want = ENG_BARS; }
+    else if (t < ENG_RH_NTYPE + BAR_NTYPE) {
+        eng_want_sub = (uint8_t)(t - ENG_RH_NTYPE);
+        eng_want = ENG_BARS;
+    } else {
+        uint32_t wt = t - BAR_NTYPE;            /* TYPE 6 -> RH_TYPE_W140 (4), TYPE 7 -> RH_TYPE_W200 (5) */
+        rh_type = (uint8_t)(wt < RH_NTYPE ? wt : 0u);
+        eng_want = ENG_RHODES;
+    }
     if (eng_want != w || (eng_want == ENG_BARS && eng_want_sub != s)) eng_epoch++;
 }
 static int eng_is_bars(void) { return eng_want == ENG_BARS; }   /* the main loop's TYPE, not the ISR latch */
@@ -445,7 +452,8 @@ static void eng_host_report(void)                /* tests/host.c, at the end of 
 #endif
     printf("rhodes steals %u\n", (unsigned)rh_h_steals);          /* tools/engine_ab.py */
     printf("bar starts max per block %u\n", (unsigned)bar_h_max_starts);   /* tests/py/test_bar_starts.py */
-    printf("type %u\n", eng_cur == ENG_BARS ? ENG_RH_NTYPE + bar_sub : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
+    printf("type %u\n", eng_cur == ENG_BARS ? ENG_RH_NTYPE + bar_sub :
+           rh_is_wurli(rh_type) ? (unsigned)(rh_type + BAR_NTYPE) : (unsigned)rh_type);   /* the TYPE last rendered (C11) */
     if (eng_h_log) fclose(eng_h_log);
     if (bar_h_pred) fclose(bar_h_pred);
 }
