@@ -1,15 +1,23 @@
 # Frodhes-Bark
 
 **An electric piano, vibraphone and marimba, computed live, for the M-VAVE FM-1, the Ableton Move, the Akai MPC and your
-computer - now with more bark - and a physically modeled Wurlitzer 200A. **
+computer - now with more bark - and physically modeled Wurlitzer 140B and 200A EP models! **
 
 This is a fork of [Frodhes](https://leonardomirabal.github.io/frodhes/) - thank you to the original developers for all of their hard work! 
+
+Frodhes-Bark is a version of Frodhes with:
+- More bark!
+- Wurlitzer 140B and 200A models in addition to the Rhodes models, vibes, and marimba.
 
 No samples: every note is calculated as you play it, from how the real instrument works. A hammer strikes a tine
 and a pickup turns its motion into sound; a mallet strikes a bar and its tube rings along. Play softly and it is
 warm; play hard and it barks or rings.
 
 Frodhes-Bark is free. If you enjoy it, you can [buy the original developer a coffee](https://ko-fi.com/leomirabal).
+
+I will be posting FM-1 firmwares on the release page - I've not tried building for the Ableton Move or MPC, but if there's interest I'll cross that bridge.
+
+This is a work in progress - I haven't updated most of the documentation yet, but plan to do so in the coming weeks.
 
 ## See what's new
 
