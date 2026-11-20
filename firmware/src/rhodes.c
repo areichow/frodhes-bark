@@ -1772,14 +1772,17 @@ static void rh_events(void)                     /* the block's start (rh_render,
 #ifdef DINGHY_PLUGIN
                         v->pdly = 0;
 #endif
-                        /* Key-off harmonic twang (1959): damper felt plucking O1 (~6.3x f0) as felt seats */
+                        /* Key-off harmonic twang (1961): smooth register-scaled felt-pluck into O1 (~6.3x f0) as damper seats */
                         if (note < 84u) {
                             int32_t ax = v->m[0].x < 0 ? -v->m[0].x : v->m[0].x;
                             int32_t ay = v->m[0].y < 0 ? -v->m[0].y : v->m[0].y;
                             int32_t a1 = ax > ay ? ax : ay;
                             int32_t nz = rh_thump > 5304 ? 5304 + ((rh_thump - 5304) >> 5) : rh_thump;
-                            int32_t reg = note <= 72u ? 256 : (int32_t)(84u - note) * 256 / 12;
+                            int32_t reg = note < 48u ? 180 + (int32_t)(note > 24u ? note - 24u : 0u) * 76 / 24
+                                        : note <= 67u ? 256 + (int32_t)(note - 48u) * 64 / 19
+                                        : (int32_t)(84u - note) * 320 / 17;
                             int32_t g, tw;
+                            uint32_t n_cl = note < 36u ? 36u : note > 72u ? 72u : note;
                             if (nz > 6400) nz = 6400;
                             reg = (reg * (v->wu ? 12 : 9)) >> 3;
                             g = mul15(nz, v->rgain);
@@ -1789,7 +1792,11 @@ static void rh_events(void)                     /* the block's start (rh_render,
                             if (tw > 0) {
                                 uint32_t o1 = v->wu ? 1u : (uint32_t)RH_O1;
                                 int32_t o1_th = v->wu ? WU_KEYS[key].o1.th : v->k->m[RH_O1].th;
-                                if (o1_th) { v->m[o1].live = 1; v->tw = tw; v->tw_dly = note < 48u ? 22u : 16u; }
+                                if (o1_th) {
+                                    v->m[o1].live = 1;
+                                    v->tw = tw;
+                                    v->tw_dly = (uint8_t)(20u - ((n_cl - 36u) * 8u) / 36u);
+                                }
                             }
                         }
                     }
@@ -1975,6 +1982,31 @@ FR_RAM2 static int32_t __attribute__((noinline)) rh_mode_p1(rh_ms_t *s)
 }
 static FR_RAM int32_t __attribute__((noinline)) rh_mode_p(rh_ms_t *s) { return rh_mode_p_t(s, 0); }
 
+/* Smooth 16-sample (0.36 ms) triangular felt-pluck excitation into O1/O2 on the single release-twang sub-block:
+ * rolls off > 5 kHz click/static energy while exciting O1 cleanly across C2..G4 (Build 1961). */
+FR_COLD static int32_t __attribute__((noinline)) rh_twang_mode(rh_ms_t *s, int32_t amp, int32_t *xp, int first)
+{
+    int32_t x = s->x, y = s->y, e = s->e, eps = s->eps, pk = 0;
+    int64_t X = ((int64_t)x << 30) | (uint32_t)s->ex, Y = ((int64_t)y << 30) | (uint32_t)s->ey;
+    uint32_t j;
+    for (j = 0; j < SUB; j++) {
+        if (j < 16u) {
+            int32_t w = (int32_t)(j < 8u ? j + 1u : 16u - j);   /* 1..8..1 */
+            int32_t dy = (int32_t)(((int64_t)amp * w) >> 6);
+            Y += (int64_t)dy << 30;
+            y = (int32_t)(Y >> 30);
+        }
+        X += (int64_t)e * y;
+        x = (int32_t)(X >> 30);
+        Y -= (int64_t)eps * y + (int64_t)e * x;
+        y = (int32_t)(Y >> 30);
+        if (first) xp[j] = x; else xp[j] += x;
+        { int32_t ax = iabs(x), ay = iabs(y); ax = ax > ay ? ax : ay; pk = ax > pk ? ax : pk; }
+    }
+    s->x = sat28i(x); s->y = sat28i(y); s->ex = (int32_t)((uint32_t)X & 0x3FFFFFFFu); s->ey = (int32_t)((uint32_t)Y & 0x3FFFFFFFu); s->peak = pk;
+    return pk >> 3;
+}
+
 /* the pickup loop with the steal fade (the plain one's arithmetic, then the fade per sample); its own function like
  * rh_pickup, so neither moves rh_voice_sub's mode-loop registers (the felt noise is a pass of its own, O6) */
 /* the steal fade's gain at fade f (Q15, 32767 .. 0 in FADE_SAMPLES): a smoothstep, 3 f^2 - 2 f^3 (0.9.13, the audio
@@ -2033,12 +2065,18 @@ FR_RAM2 static __attribute__((noinline)) void rh_voice_sub(rh_voice_t *v, int32_
             s->eps = s->epss + (int32_t)(((int64_t)(pt - s->epss) * f) >> 15);
         }
     }
+    int32_t tw_fire = 0;
+    uint32_t tw_o1 = 0u;
     if (v->tw_dly) {
         if (--v->tw_dly == 0u && v->tw) {
-            uint32_t o1 = v->wu ? 1u : (uint32_t)RH_O1;
-            v->m[o1].y = sat28i(v->m[o1].y + v->tw);
-            if (!v->wu && v->m[RH_O2].live)
-                v->m[RH_O2].y = sat28i(v->m[RH_O2].y + ((v->tw * 90) >> 8));
+            tw_o1 = v->wu ? 1u : (uint32_t)RH_O1;
+            {
+                rh_ms_t *s = &v->m[tw_o1];
+                s->live = 1;
+                s->e = s->e0 + (int32_t)(((int64_t)(s->e1 - s->e0) * v->w_tgt) >> 15);
+                s->eps = s->eps0 + (int32_t)(((int64_t)(s->eps1 - s->eps0) * v->w_tgt) >> 15);
+            }
+            tw_fire = v->tw;
             v->tw = 0;
         }
     }
@@ -2078,9 +2116,14 @@ FR_RAM2 static __attribute__((noinline)) void rh_voice_sub(rh_voice_t *v, int32_
     if (m == RH_NM)
         for (j = 0; j < SUB; j++) rh_x[j] = 0;
     else {
-        sum += fnz ? rh_mode_f1(&v->m[m]) : rh_mode_p1(&v->m[m]);
+        sum += (tw_fire && m == tw_o1) ? rh_twang_mode(&v->m[m], tw_fire, rh_x, 1)
+             : fnz ? rh_mode_f1(&v->m[m]) : rh_mode_p1(&v->m[m]);
         for (m++; m < RH_NM; m++)
-            if (v->m[m].live) sum += fnz ? FR_FAR(rh_mode_f)(&v->m[m]) : FR_FAR(rh_mode_p)(&v->m[m]);
+            if (v->m[m].live) {
+                if (tw_fire && m == tw_o1) sum += rh_twang_mode(&v->m[m], tw_fire, rh_x, 0);
+                else if (tw_fire && !v->wu && m == (uint32_t)RH_O2) sum += rh_twang_mode(&v->m[m], (tw_fire * 77) >> 8, rh_x, 0);
+                else sum += fnz ? FR_FAR(rh_mode_f)(&v->m[m]) : FR_FAR(rh_mode_p)(&v->m[m]);
+            }
     }
 #ifdef FR_HQ
     if (!v->wu && hq_v[v - rv].os) Hp = hq_pickup(v, mix, side, Hp, gain); else   /* (gain: with the lift) */
@@ -2148,7 +2191,7 @@ FR_RAM2 static __attribute__((noinline)) void rh_voice_sub(rh_voice_t *v, int32_
         return;
     }
     v->lvl = sum; if (sum > v->lvl0) v->lvl0 = sum;
-    if (!v->ptab && !v->felt_n && sum < RH_KILL(v, k)) {   /* died away; a stolen voice dying in its fade still
+    if (!v->ptab && !v->felt_n && !v->tw_dly && sum < RH_KILL(v, k)) {   /* died away; a stolen voice dying in its fade still
                                                            * starts the note waiting for it (it ended, and the note was
                                                            * lost: BUGHUNT #21) */
         v->alive = 0;
@@ -2156,7 +2199,7 @@ FR_RAM2 static __attribute__((noinline)) void rh_voice_sub(rh_voice_t *v, int32_
         return;
     }
     for (m = 1; m < RH_NM; m++)                           /* sleep overtone modes that have died away */
-        if (v->m[m].live && !v->ptab && v->m[m].peak < RH_OKILL(v, k)) {
+        if (v->m[m].live && !v->ptab && !v->tw_dly && v->m[m].peak < RH_OKILL(v, k)) {
             v->m[m].live = 0; v->m[m].x = v->m[m].y = v->m[m].ex = v->m[m].ey = 0;
         }
 }

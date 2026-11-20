@@ -53,4 +53,13 @@
 3210 midi 0xB0 104 64
 3250 midi 0x90 60 100
 3450 midi 0x80 60 127
-3650 end
+# Build 1961: D4 (62) & G4 (67) held 300 ms on STAGE 77 (NOISE 64) still produce key-off twang (no O1 sleep race)
+3700 midi 0xB0 80 0
+3710 midi 0xB0 104 64
+3750 midi 0x90 62 96
+4050 midi 0x80 62 64
+4080 expect rms > -55
+4350 midi 0x90 67 96
+4650 midi 0x80 67 64
+4680 expect rms > -55
+4950 end
