@@ -44,7 +44,7 @@
 # K2 SELECT: the next page (FRODHES); its K4 is empty since the velocity page (74789ff4: KEY VEL moved there), so K8
 # reaching card 4 is the PERFORM check above
 700 turn 1 1
-800 expect state page FRODHES
+800 expect state page FRODHES-BARK
 # K6 / K7 on FRODHES: the engine's K2 / K3 (TONE, BELL): a turn moves them, not the cards beside
 1100 turn 5 1
 1100 turn 6 1

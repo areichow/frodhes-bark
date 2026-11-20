@@ -134,7 +134,7 @@ FR_COLD static void smk_fx_switch(uint32_t k)          /* TREM/WAH, CHORUS, DELA
 }
 FR_COLD static void smk_pad_hit(uint32_t p)
 {
-    if (p < N_TYPE_N) {                        /* the TYPE, as ALGORITHM sets it */
+    if (p < SP_PREV) {                         /* the TYPE (0..5 on Pads 0..5; Pads 6..7 are PREV/NEXT presets) */
         type_pick((int32_t)p);
         ui_say_big(N_TYPE_LONG[PV(P_TYPE)]);
     } else if (p == SP_PREV || p == SP_NEXT)
@@ -355,7 +355,7 @@ FR_COLD static void smk_pad_rgb(uint32_t p, int on, int act)
 FR_COLD static void smk_leds(void)
 {
     uint32_t p, snd = (uint32_t)smk_sounding(), fx = snd && !fx_bypass, pos = pg_pos(ui_page, ui_vp_ok());
-    for (p = 0; p < N_TYPE_N; p++) smk_pad_rgb(p, PV(P_TYPE) == p, (int)snd);
+    for (p = 0; p < SP_PREV; p++) smk_pad_rgb(p, PV(P_TYPE) == p, (int)snd);
     smk_pad_rgb(SP_PREV, smk_pad_t[SP_PREV] && fm1_ms - smk_pad_t[SP_PREV] < 200u, 1);   /* (a flash when pressed) */
     smk_pad_rgb(SP_NEXT, smk_pad_t[SP_NEXT] && fm1_ms - smk_pad_t[SP_NEXT] < 200u, 1);
     smk_pad_rgb(SP_DRIVE, PV(P_DRV_SW) && PV(P_DRIVE), (int)fx);

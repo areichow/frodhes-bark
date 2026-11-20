@@ -9,7 +9,7 @@
 100 expect led 3 1
 # > <: the pages, as SELECT
 200 btn 3
-300 expect state page FRODHES
+300 expect state page FRODHES-BARK
 300 expect led 2 1
 400 btn 2
 500 expect state page PERFORM
