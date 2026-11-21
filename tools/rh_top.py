@@ -49,7 +49,7 @@ G_MAX = 8                              # the loudness's gain back at most 1.5 dB
 # gain back (RH_TOP_G) rides the square of that ramp (rhodes.c rh_top_x), held to G64_DB at v64 (the mf level as it was)
 CAP_K0 = 76
 # per TYPE (STAGE 77, SUITCASE, FELT, DYNO): the v127 target's offset at and under CAP_K0, dB
-TOP_POINTS = [[21, 9.5], [40, 13.0], [50, 14.0], [59, 8.5], [64, 5.5], [71, -0.5], [76, TARGET]]
+TOP_POINTS = [[21, 18.0], [36, 17.5], [48, 16.5], [55, 14.5], [59, 8.5], [64, 5.5], [71, -0.5], [76, TARGET]]
 TYPE_D = (0.0, -4.5, -2.5, 4.5)
 G64_DB = 0.3
 CAP_POINTS = [[76, TARGET], [80, -30.0], [84, -31.0], [90, -35.0], [108, -35.0]]

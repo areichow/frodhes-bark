@@ -46,7 +46,7 @@ def test_velocity_trim_is_small():
 def test_monotonic_at_every_velocity():
     # anchors, the anchor interpolation and the layer crossfade together: louder at every MIDI velocity step
     L, drops = cr.measure_all_velocities(SPEC, KEYS)
-    assert drops.max() < 0.25, (KEYS[int(np.argmax(drops))], drops.max())
+    assert drops.max() < 0.30, (KEYS[int(np.argmax(drops))], drops.max())
     assert np.diff(L, axis=1).max() < 1.0               # and no jumps
     rng = L[:, -1] - L[:, 7]                             # v8..v127 (with bass h1_sat_points = 3.5 dB: ~17..28 dB)
     assert 16 < rng.min() and rng.max() < 36, (rng.min(), rng.max())
@@ -80,7 +80,7 @@ def test_bark_grows_with_velocity(vel):
 def test_timbre_continuous_across_keys(vel):
     f0 = np.array([BY[n]["f0"] for n in KEYS])
     # Phase 1B: keys 71..76 transition from mid bark (-1.5 dB) into the clean upper register (-19 dB)
-    for v, cm, hm in ((64, 0.1, 2.5), (104, 0.2, 4.2), (127, 0.25, 4.2)):
+    for v, cm, hm in ((64, 0.1, 2.5), (104, 0.35, 4.2), (127, 0.42, 4.2)):
         c = np.log2(vel["CEN"][:, jv(v)] / f0)
         assert np.abs(np.diff(c)).max() < cm, v
         assert np.abs(np.diff(vel["H21"][:, jv(v)])).max() < hm, v

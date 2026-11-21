@@ -48,7 +48,7 @@ NANCH = len(V_ANCH)
 PU_N = 256
 S_MAX_GAP2 = 4.0
 WU_U_MAX = 67108863        # Q25: < 2.0 -> s_scaled = u^2 < 4.0 -> i in [0, 255]
-Z_SCALE = 1.0 / math.sqrt(2.0)  # scale physical z by 1/sqrt(2) so [0, 8) gap^2 maps to [0, 4) in 256 cells
+Z_SCALE = 1.0 / math.sqrt(2.5)  # scale physical z by 1/sqrt(2.5) so [0, 10) gap^2 maps to [0, 4) in 256 cells
 WU_KAP_HI = 69             # keys 21..68 (48 keys)
 ROM_LO, ROM_HI = 0xFFC00000, 0xFFCFFFFF
 PHI_BIAS = 1 << 28
@@ -56,20 +56,24 @@ Q30, Q28, Q25, Q16 = 1 << 30, 1 << 28, 1 << 25, 1 << 16
 
 # Electrostatic comb pickup geometry (half-height a, horizontal gap g)
 COMB_A = 1.0
-COMB_G = 0.45
+COMB_G = 0.35
 
 # Deterministic per-key jitter seed
 JIT_SEED = 200
 
-# Modal & voicing curves fitted to .local/wurli/200a/ acoustic measurements
+# Modal & voicing curves fitted to .local/wurli/200a/ & .local/ptq-samples/wurli/ acoustic measurements
 T60_V1_PTS = [[21, 14.0], [36, 12.5], [45, 11.5], [60, 7.4], [65, 5.3], [69, 3.1], [84, 2.4], [89, 2.1], [108, 1.0]]
 T60_REL_PTS = [[21, 0.28], [36, 0.22], [45, 0.16], [60, 0.11], [69, 0.10], [84, 0.08], [108, 0.06]]
 O1_RATIO_PTS = [[21, 5.65], [45, 5.85], [60, 6.12], [108, 6.12]]
 T60_O1_PTS = [[21, 0.18], [45, 0.12], [60, 0.07], [72, 0.04], [108, 0.025]]
 O1_WEIGHT_PTS = [[21, 0.16], [45, 0.13], [60, 0.09], [76, 0.05], [108, 0.03]]
 
+# Register-dependent resting offset z0 (gap units): deeper into comb in bass for thick even+odd growl,
+# transitioning to 0.85 from E3 up for classic odd-dominant Wurlitzer mid-range bark.
+Z0_PTS = [[21, 0.58], [45, 0.58], [48, 0.74], [52, 0.85], [108, 0.85]]
+
 # Target v127 V1 peak tip excursion (gap units) across registers
-X127_PTS = [[21, 1.45], [48, 1.45], [60, 1.15], [72, 0.75], [84, 0.35], [108, 0.25]]
+X127_PTS = [[21, 2.15], [45, 2.15], [48, 1.80], [60, 1.35], [72, 0.80], [84, 0.38], [108, 0.25]]
 
 # Target negative attack pitch dip at v127 (cents) for keys 21..69
 DIP_CENTS_PTS = [[21, 28.0], [41, 28.0], [45, 16.0], [48, 6.0], [60, 2.0], [69, 0.0]]
@@ -161,8 +165,8 @@ def comb_dc_ds(s):
 def comb_pickup_table():
     ds = S_MAX_GAP2 / PU_N
     s = np.arange(PU_N + 1) * ds
-    phi = comb_c(np.sqrt(2.0 * s))
-    dds = 2.0 * comb_dc_ds(2.0 * s) * ds
+    phi = comb_c(np.sqrt(2.5 * s))
+    dds = 2.5 * comb_dc_ds(2.5 * s) * ds
     A = float(max(np.max(np.abs(phi)), np.max(np.abs(dds))))
     P = [PHI_BIAS - int(round(x * Q28 / A)) for x in phi]
     M = [-int(round(x * Q28 / A)) for x in dds]
@@ -387,7 +391,7 @@ def build():
     keys = []
     for n in range(KEY_LO, KEY_HI + 1):
         f0 = gr.midi_hz(n)
-        off = 0.90 + 0.02 * jit(n, "off")
+        off = lin_interp(n, Z0_PTS) + 0.02 * jit(n, "off")
         t60_v1 = log_interp(n, T60_V1_PTS) * (1.0 + 0.06 * jit(n, "t60"))
         t60_rel = log_interp(n, T60_REL_PTS)
         o1_f = f0 * lin_interp(n, O1_RATIO_PTS)
@@ -659,7 +663,7 @@ def emit_header(spec, phim):
         w("    {" + ",".join(map(str, bd["plev"])) + "},")
     w("};")
     w("static const uint16_t WU_KAP[WU_KAP_HI - WU_KEY_LO] = {")
-    kap = [min(65535, int(v * 2)) for v in spec["kap"]]
+    kap = [min(65535, int(round(v * 2.5))) for v in spec["kap"]]
     for i in range(0, len(kap), 16):
         w("    " + ",".join(str(v) for v in kap[i:i + 16]) + ",")
     w("};")

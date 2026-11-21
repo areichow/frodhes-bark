@@ -676,7 +676,9 @@ def fam_shift(p, f):
 
 
 def pickup_off(p, f):
-    """the rest offset of family f's keys (gap): params pickup.off_gap in the 1/32" gap, divided by gap_rel"""
+    """the rest offset of family f's keys (gap): off_gap_fam[f] if given, else off_gap / gap_rel[f]"""
+    if "off_gap_fam" in p["pickup"]:
+        return p["pickup"]["off_gap_fam"][f]
     return p["pickup"]["off_gap"] / p["pickup"]["gap_rel"][f]
 
 
@@ -920,7 +922,7 @@ def emit(spec, fam_tabs):
         w("static const float RH_DRV_BSC[RH_NKEY] = {" + ",".join("%.9gf" % k["drive"]["bsc"] for k in spec["keys"]) + "};")
         w("#endif")
         w("static const uint16_t RH_KAP_X[48 - RH_KEY_LO] = {" + ",".join(
-            str(max(1, min(65535, int(round(65536 / k["drive"]["m127"] ** 2))))) for k in spec["keys"] if k["midi"] < 48) + "};")
+            str(max(1, min(65535, int(round(65536 / k["drive"]["bsc"] ** 2))))) for k in spec["keys"] if k["midi"] < 48) + "};")
     w("static const uint8_t RH_VPOS_I[128] = {" + ",".join(map(str, spec["vpos_idx"])) + "};")
     w("static const uint8_t RH_VPOS_F[128] = {" + ",".join(str(min(255, f)) for f in spec["vpos_frac"]) + "};")
     li, lw = vlayers()

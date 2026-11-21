@@ -39,10 +39,8 @@ HDR = os.path.join(ROOT, "firmware", "gen", "rh_tone_g.h")
 FS = 44100
 Q25 = 1 << 25
 TYPES = ["STAGE77", "SUITCASE", "FELT", "DYNO"]          # CC 80 = index * 32
-KEYS = (36, 48, 57, 72, 84)                                # the 1/32" pickup family (S8: family 1)
-FKEYS = {1: KEYS, 0: (24, 28, 32, 96, 100)}               # per pickup family: its own curve (the 1/16" one: family 0,
-                                                           # keys <= 32 and >= 96, its own flux table and half the
-                                                           # offsets)
+KEYS = (57, 64, 72, 79, 84)                                # the 1/32" pickup family (S8: family 1, keys 56..95)
+FKEYS = {1: KEYS, 0: (24, 36, 48, 96, 100)}               # per pickup family: its own curve (family 0: keys <= 55 and >= 96)
 ANCHORS = tuple(range(64, 128, 4)) + (127,)
 VELS = (40, 127)                                           # the two curves: soft, hard (rh_tone_gain blends them)
 SH = 18                                                    # the grid step: 2^18 Q25 = 1/128 gap
