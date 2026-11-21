@@ -36,6 +36,7 @@ static int32_t tp_g;                                    /* TAPE's fade gain (Q15
 static int32_t dly_xg = 32768;                          /* DIG / ANA's fade gain around TAPE (Q15) */
 static uint8_t dly_cur, dly_last;                       /* the line's owner: 3 TAPE, else the old loops; their last sw */
 static int32_t tp_kf, tp_kq = TP_KQ, tp_kh;             /* this block's coefficients (Q24, Q14, Q15) */
+static int32_t tp_mr[256] POOL;                         /* stereo right ping-pong tap per sample */
 
 /* the wow / flutter pre-pass: dly_dt[] = this block's delay per sample (Q8); s = log2 speed re the reference (Q12),
  * lv = log2 T (Q12) */
@@ -97,16 +98,17 @@ static inline __attribute__((always_inline)) void tp_tape_k(int32_t *m, const in
                                                         * level, the bars' 3 dB up into the curve, its output back down) */
     FX_K32 kf = tp_kf, kr = tp_kq, kh = tp_kh, kfb = fb;
     for (j = 0; j < n; j++) {
-        int32_t d, r, x, y, in, v;
+        int32_t d, r, rR, x, y, in, v;
         uint32_t i;
         d = dt[j];
         i = (w - (uint32_t)(d >> 8)) & (DLY_LEN - 1u);
         if (rst && c <= DLY_LEN) {                      /* (as dly_loop: behind the clean span reads 0) */
             uint32_t lb = (w - i) & (DLY_LEN - 1u);
             r = DLY_H4C(i, lb, c, d & 255);              /* (fx.c's 4-point read, 0.9.8 fxq-mod) */
-            c++;
         } else
             r = DLY_H4(i, d & 255);
+        rR = d >= (512 << 8) ? FR_FAR(dly_tap_r)(w, d, c, rst) : r;
+        if (rst && c <= DLY_LEN) c++;
         /* the playback head: the bump (2nd-order high-pass, resonant; Q4 inside) */
         x = (r << 4) - b2 - (int32_t)(((int64_t)b1 * kr) >> 14);
         {   /* (kf, kh read once a sample each, used twice: one stack load, not two) */
@@ -135,6 +137,7 @@ static inline __attribute__((always_inline)) void tp_tape_k(int32_t *m, const in
         dly_buf[w & (DLY_LEN - 1u)] = (int16_t)x;
         w++;
         m[j] = y;                                       /* (heard x wet in tp_loop: ramped there) */
+        tp_mr[j] = d >= (512 << 8) ? rR : y;
     }
     dly_w = w; tp_b1 = b1; tp_b2 = b2; tp_h1 = h1; tp_h2 = h2;
 }
@@ -164,12 +167,16 @@ FX_RAM __attribute__((noinline)) static void tp_loop(int32_t *L, int32_t *R, int
     int32_t dg = dly_dg, *e = L + n, wq = w0 << 8, ws = FR_FAR(dly_wstep)(w0, wet, n);   /* (RAM: 0.9.6) */
     if (msk) FR_FAR(dly_ramp)(m, n, sg16);                      /* (each fade piece its own ramp, as it was) */
     FR_FAR(tp_tape)(m, dt, n, msk, fb);
-    for (; L < e; L++, R++) {
-        int32_t y;
-        wq += ws;
-        y = (int32_t)(((int64_t)*m++ * (wq >> 8)) >> 15);
-        DLY_DG_STEP(dg, dgt);
-        *L = (int32_t)(((int64_t)*L * dg) >> 15) + y; *R = (int32_t)(((int64_t)*R * dg) >> 15) + y;
+    {
+        const int32_t *mr = tp_mr;
+        for (; L < e; L++, R++) {
+            int32_t yL, yR;
+            wq += ws;
+            yL = (int32_t)(((int64_t)*m++ * (wq >> 8)) >> 15);
+            yR = (int32_t)(((int64_t)*mr++ * (wq >> 8)) >> 15);
+            DLY_DG_STEP(dg, dgt);
+            *L = (int32_t)(((int64_t)*L * dg) >> 15) + yL; *R = (int32_t)(((int64_t)*R * dg) >> 15) + yR;
+        }
     }
     dly_dg = dg; dly_sgk = msk ? sg16 : 0;              /* (fx.c dly_son) */
 }

@@ -95,6 +95,7 @@ typedef struct {
     uint32_t w, e, quiet;           /* the write row, samples since the start (to RQH_WARM), quiet samples */
     uint32_t ph[4];                 /* the LFOs (the modulated lines) */
     int32_t lp[RQH_NL];             /* the one-poles */
+    int32_t in_lp;                  /* input pre-damping 1-pole LP (~7.5 kHz) */
     int32_t g[RQH_NL];              /* the gains, Q15, x sqrt 2 (the line ends 4 / sqrt 8 of the orthonormal's) */
     int32_t gsz, gdmp, p;           /* the size and damp the gains / pole were made for; the pole (Q15) */
     uint16_t ad[RQH_AN];            /* the allpasses' indices */
@@ -241,8 +242,17 @@ static __attribute__((noinline)) void rev_hqh_run(rev_hqh_t *s, const int32_t *i
                                                          * block, 2.3 % of T60: a jump would step the tail) */
         rqh_gains(s, s->gsz < 0 ? c->size : s->gsz + (c->size > s->gsz ? 1 : -1));
     if (c->damp != s->gdmp) { s->p = rqh_pole(c->damp); s->gdmp = c->damp; }
-    for (i = 0; i < RQ_NC; i++) { s->x[i] = in[i]; act |= in[i]; }
     lo = s->amax < 2u * RQH_LOUD;
+    {
+        int32_t ilp = s->in_lp;
+        for (i = 0; i < RQ_NC; i++) {
+            int32_t d = in[i] - ilp;
+            ilp += lo ? sh_tz(d * 21000, 15) : ((d * 21000 + 16384) >> 15);
+            s->x[i] = ilp;
+            act |= in[i] | ilp;
+        }
+        s->in_lp = ilp;
+    }
     FR_FAR(rqh_dif)(s, s->x, lo);
     for (k = 0; k < RQH_NL; k++) {
         uint32_t D = RQH_LEN[k], f = 0, r;

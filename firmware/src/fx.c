@@ -954,7 +954,7 @@ static inline __attribute__((always_inline)) int32_t div10(int32_t v) { return (
  * moves the cutoff all the time: -47 dB on a loud 1 kHz sine). The output law as before: 0.9 x the band-pass x 2q +
  * 0.4 x the low-pass. Its sub-block (k <= 32 samples) into out: the wah, its make-up gain ramped (wgq, wgs a sample),
  * the input clipped to WAH_XM */
-static int32_t wah_bp, wah_lp, wah_cr = -1;     /* the stage's state (x 64), the cutoff's row (-1: none yet) */
+static int32_t wah_bp, wah_lp, wah_cr = -1, wah_f; /* the stage's state (x 64), the cutoff's row (-1: none yet) and smooth f */
 #define WAH_CL(v) ((v) > (1 << 26) ? (1 << 26) : (v) < -(1 << 26) ? -(1 << 26) : (v))   /* (the resonant peak: ~7x
                                                  * 2^22; the output's sum < 2^31) */
 FX_RAM __attribute__((noinline)) static void wah_sub(const int32_t *mp, uint32_t k, int32_t *out, int32_t wgq,
@@ -965,7 +965,7 @@ FX_RAM __attribute__((noinline)) static void wah_sub(const int32_t *mp, uint32_t
                                                  * BAR_FX_K, their SND3 -3 dB a level; the Rhodes 4 (depth + 16)) */
     int32_t et = (16777216 + dk - 1) / dk;      /* (env x dk) >> 18 reaches row 63 from env >= et: below it the
                                                  * product fits 32 bits */
-    int32_t bp = wah_bp, lp = wah_lp, cr = wah_cr, f = cr < 0 ? 0 : (int32_t)FX_WAH_F[cr], mi = 0, mo = 0;
+    int32_t bp = wah_bp, lp = wah_lp, cr = wah_cr, f = cr < 0 ? -1 : wah_f, mi = 0, mo = 0;
     int32_t wx[32];                             /* (the output on the bus' grain, x: pass 1 -> pass 2) */
     int32_t q18 = 18 * q;                       /* (q: 2464 .. 9830, fx_trem: 18 q fits 32 bits, 32 x 32 below) */
     uint32_t j;
@@ -977,9 +977,22 @@ FX_RAM __attribute__((noinline)) static void wah_sub(const int32_t *mp, uint32_t
         if (a > WAH_XM) { a = WAH_XM; xin = xin < 0 ? -WAH_XM : WAH_XM; WAH_HC(); }   /* (BUGHUNT #26: the stage's range) */
         if (a > env) env += (a - env) >> 3; else env -= (env >> 11) + 1;
         if (env < 0) env = 0;
-        {                                       /* the cutoff's row, 0 .. 63: up at once, down a row late */
-            int32_t row = env >= et ? 63 : (env * dk) >> 18;   /* env >= 0, dk > 0 */
-            if (row > cr || row < cr - 1) { cr = row > cr ? row : row + 1; f = (int32_t)FX_WAH_F[cr]; }
+        {                                       /* continuous interpolated cutoff + 1-pole glide (no 64-step zipper) */
+            int32_t f_tgt;
+            if (env >= et) {
+                f_tgt = (int32_t)FX_WAH_F[63];
+                cr = 63;
+            } else {
+                int32_t pos = env * dk;
+                int32_t row = pos >> 18;
+                int32_t frac = (pos >> 8) & 1023;
+                int32_t f0 = (int32_t)FX_WAH_F[row];
+                int32_t f1 = (int32_t)FX_WAH_F[row < 63 ? row + 1 : 63];
+                f_tgt = f0 + (((f1 - f0) * frac) >> 10);
+                cr = row;
+            }
+            if (f < 0) f = f_tgt;
+            else f += (f_tgt - f) >> 4;
         }
         {
             int32_t hi = (xin << 6) - lp - (int32_t)(((int64_t)q * bp + (1 << 13)) >> 14);
@@ -1010,7 +1023,7 @@ FX_RAM __attribute__((noinline)) static void wah_sub(const int32_t *mp, uint32_t
         es += (vi - es) >> 11;
     }
     wah_env = env; wah_ein = ei; wah_eout = eo; wah_eslow = es; wah_pi = xi; wah_po = xo;
-    wah_bp = bp; wah_lp = lp; wah_cr = cr;
+    wah_bp = bp; wah_lp = lp; wah_cr = cr; wah_f = f;
     wah_pki -= wah_pki >> 5; wah_pki = mi > wah_pki ? mi : wah_pki;   /* (the peaks: at once up, ~23 ms down) */
     wah_pko -= wah_pko >> 5; wah_pko = mo > wah_pko ? mo : wah_pko;
 }
@@ -1315,9 +1328,7 @@ __attribute__((noinline)) static int32_t ph_glide(int32_t ct, int32_t gt, int32_
     ph_fq += PH_CL(fbk - ph_fq, -64, 64);               /* (~0.26 s) */
     *ksh = 32768 - (23268 * 4096) / ph_gq;              /* the shelf: x 0.71 on the bass at the level 1 (9500) */
     a[0] = ph_coef(ph_ph, ph_dq, ph_cq);
-    a[1] = ph_coef(ph_ph + 0x15555555u, ph_dq, ph_cq);  /* the right side 30 degrees behind (was 90: a mono sound
-                                                         * turned very wide, heard as a jump in level, the user
-                                                         * 2026-10-17) */
+    a[1] = ph_coef(ph_ph + 0x35555555u, ph_dq, ph_cq);  /* right side 75 degrees behind for lush stereo swirl */
     /* the coefficients glide sample by sample from the last sub-block's (0.9.8 fxq-mod; they stepped every 32: images
      * of a tone at +-1378 Hz, -39 dB re a 3 kHz tone at SPEED 127, tools/fxq_metrics.py); held still, the same */
     a0[0] = ph_apv ? ph_ap[0] : a[0]; a0[1] = ph_apv ? ph_ap[1] : a[1];
@@ -1326,7 +1337,7 @@ __attribute__((noinline)) static int32_t ph_glide(int32_t ct, int32_t gt, int32_
          * tools/fx_pristine.py, 2026-11-08); the trim holds a chord's peak at the phaser off's (+0.5 dB at most, a
          * single note's +2), DEPTH 0 by its RMS. In the gain, so the low shelf (ksh, from PH_G) keeps its shape: the
          * tone the same (here, once a sub-block: in fx_phaser it moved the sample loop's registers, +7 a sample) */
-        static const int16_t PH_T[9] = {3814, 3907, 3567, 2659, 2940, 3008, 3058, 3024, 2952};
+        static const int16_t PH_T[9] = {3814, 3907, 3700, 3150, 3300, 3350, 3380, 3320, 3200};
         int32_t di = ph_dq >> 12, df = ph_dq & 4095;
         int32_t tr = PH_T[di] + (((PH_T[di + 1 > 8 ? 8 : di + 1] - PH_T[di]) * df) >> 12);
         /* the trim glides 4 (0.008 dB) a sub-block, as the level: following DEPTH's glide it stepped up to 0.03 dB
@@ -1433,13 +1444,12 @@ FX_RAM __attribute__((noinline)) static void fx_phaser(int32_t *L, int32_t *R, u
 #endif
 }
 
-/* ---- CHORUS: 7 ms +- 3.5 ms, two taps 90 degrees apart */
+/* ---- CHORUS: 7.5 ms +- 1.8 ms, true stereo (512 samples/ch, 0 extra RAM), anti-phase 180 deg */
 static uint32_t cp_ph;
-/* the line, full precision (it was int16 of x / 2: a noise floor ~65 dB under the note, TODO #7), read through
- * cho_b = cho_buf + 1 with three guards for the 4-point reads: cho_b[-1] = cho_b[1023], cho_b[1024 .. 1025] =
- * cho_b[0 .. 1] (refreshed after each block's writes) */
-static int32_t cho_buf[1027] POOL;
-#define cho_b (cho_buf + 1)
+/* two 512-sample lines, full precision, each with three guards for 4-point reads:
+ * cho_b(ch)[-1] = cho_b(ch)[511], cho_b(ch)[512 .. 513] = cho_b(ch)[0 .. 1] */
+static int32_t cho_buf[2][515] POOL;
+#define cho_b(ch) (cho_buf[ch] + 1)
 static uint32_t cho_w;
 #ifndef CHO_HPS
 #define CHO_HPS 5                                       /* the wet's high-pass: a one-pole, 2^-5 a sample (~220 Hz) */
@@ -1492,14 +1502,14 @@ static inline __attribute__((always_inline)) int32_t cho_herm(const int32_t *a, 
  * this one's over its 32 samples; 0: they are constant, the cheaper loop). Only the tap's part above ~220 Hz is mixed
  * in: (t - l) is high-passed (hl the low part), so the dry's bass is never cancelled by the 7 ms tap's comb (its first
  * notch sits near 71 Hz: C2 -10 dB at DEPTH 64, the audit 2026-10-25) */
-static inline __attribute__((always_inline)) int32_t cho_tap_k(int32_t *x, uint32_t k, uint32_t v, uint32_t e,
+static inline __attribute__((always_inline)) int32_t cho_tap_k(int32_t *x, const int32_t *cb, uint32_t k, uint32_t v, uint32_t e,
                                                               int32_t km, int32_t cg, int32_t dk, int32_t dc,
                                                               int32_t hl, int32_t *lyp, const int ramp)
 {
     int32_t *xe = x + k, ly = *lyp;
     if (ramp) { km <<= 5; cg <<= 5; }
     for (; x < xe; x++) {
-        int32_t l = *x, t = cho_herm(cho_b + ((v >> 13) & 1023u), (int32_t)((v >> 3) & 1023u)), d;
+        int32_t l = *x, t = cho_herm(cb + ((v >> 13) & 511u), (int32_t)((v >> 3) & 1023u)), d;
         int32_t kq, cq;
         FX_KEEP(km);
         v += e;
@@ -1520,13 +1530,13 @@ static inline __attribute__((always_inline)) int32_t cho_tap_k(int32_t *x, uint3
 }
 /* one side over the block, its sub-blocks' settings in kb (in place; its own registers: inlined it spilled). Each side
  * reads only the line (written for the whole block first) and its own samples */
-FR_RAM2 __attribute__((noinline)) static int32_t cho_side(int32_t *x, const cho_k_t *kb, uint32_t n, int32_t hl, int32_t *ly)
+FR_RAM2 __attribute__((noinline)) static int32_t cho_side(int32_t *x, const int32_t *cb, const cho_k_t *kb, uint32_t n, int32_t hl, int32_t *ly)
 {
     uint32_t sb;
     for (sb = 0; sb < n; sb += 32u, kb++) {
         uint32_t k = n - sb < 32u ? n - sb : 32u;
-        if (!kb->dk && !kb->dc) hl = cho_tap_k(x + sb, k, kb->v, kb->e, kb->km, kb->cg, 0, 0, hl, ly, 0);
-        else hl = cho_tap_k(x + sb, k, kb->v, kb->e, kb->km, kb->cg, kb->dk, kb->dc, hl, ly, 1);   /* (DEPTH moving) */
+        if (!kb->dk && !kb->dc) hl = cho_tap_k(x + sb, cb, k, kb->v, kb->e, kb->km, kb->cg, 0, 0, hl, ly, 0);
+        else hl = cho_tap_k(x + sb, cb, k, kb->v, kb->e, kb->km, kb->cg, kb->dk, kb->dc, hl, ly, 1);   /* (DEPTH moving) */
     }
     return hl;
 }
@@ -1534,23 +1544,23 @@ FR_RAM2 __attribute__((noinline)) static int32_t cho_side(int32_t *x, const cho_
 /* the same with the mix and the make-up held over the whole block (DEPTH still: every block but a DEPTH move's), in
  * RAM (FX_RAM: a leaf); cho_side above, from flash, takes the blocks where they move (2026-11-09: the make-up's low
  * part, cho_ly, put .ram_text 28 B over with both loops in RAM) */
-FX_RAM __attribute__((noinline)) static int32_t cho_side_k(int32_t *x, const cho_k_t *kb, uint32_t n, int32_t hl,
+FX_RAM __attribute__((noinline)) static int32_t cho_side_k(int32_t *x, const int32_t *cb, const cho_k_t *kb, uint32_t n, int32_t hl,
                                                            int32_t *ly)
 {
     uint32_t sb;
     for (sb = 0; sb < n; sb += 32u, kb++)
-        hl = cho_tap_k(x + sb, n - sb < 32u ? n - sb : 32u, kb->v, kb->e, kb->km, kb->cg, 0, 0, hl, ly, 0);
+        hl = cho_tap_k(x + sb, cb, n - sb < 32u ? n - sb : 32u, kb->v, kb->e, kb->km, kb->cg, 0, 0, hl, ly, 0);
     return hl;
 }
 #endif
 /* a tap's position (Q8) at the LFO's ph, swq the sweep's width x 256 (|osc x swq| < 2^31) */
 __attribute__((noinline)) static int32_t cho_pos(uint32_t ph, int32_t swq)
 {
-    return 308 * 256 + ((osc_sine(ph) * swq) >> 15);
+    return 330 * 256 + ((osc_sine(ph) * swq) >> 15);
 }
 static void fx_chorus(int32_t *L, int32_t *R, uint32_t n)   /* (in fx_delay's function: see there) */
 {
-    int32_t depth = fx_p[FXP_CP_DEPTH], sw = 154 * depth / 127;
+    int32_t depth = fx_p[FXP_CP_DEPTH], sw = 80 * depth / 127;
     uint32_t inc = fx_cp_sync_inc ? fx_cp_sync_inc : FX_LFO_INC[fx_p[FXP_CP_SPEED]] >> 1, sb;
     int on = fx_p[FXP_CP_SW] != 0;
     int32_t w1, mt = (16384 * (2 * depth > 127 ? 127 : 2 * depth)) / 127;
@@ -1563,21 +1573,27 @@ static void fx_chorus(int32_t *L, int32_t *R, uint32_t n)   /* (in fx_delay's fu
         if (cho_fill) cho_fill--;
         if (cho_el < 0) {
             cho_swq = sw << 8;
-            cho_el = cho_pos(cp_ph, cho_swq); cho_er = cho_pos(cp_ph + 0x40000000u, cho_swq);
+            cho_el = cho_pos(cp_ph, cho_swq); cho_er = cho_pos(cp_ph + 0x80000000u, cho_swq);
         }
     }
     w1 = xf_pre_c(cho_xw, con, L, R, n, XF_STEP_CP);
-    {   /* the chunk's line first, then its taps (they read 153 .. 465 samples back: written in the chunks before) */
+    {   /* the chunk's stereo lines first, then their taps (250 .. 410 samples back < 512) */
         uint32_t p = 0u - cho_w;
         const int32_t *l = L + fxc_o, *r = R + fxc_o, *le = L + fxc_e;
-        for (; l < le; l++, r++) { cho_b[p & 1023u] = clampi(FX_HC(2, (*l + *r) >> 1, -1048575, 1048575), -1048575, 1048575); p--; }
+        for (; l < le; l++, r++) {
+            uint32_t idx = p & 511u;
+            cho_b(0)[idx] = clampi(FX_HC(2, *l, -1048575, 1048575), -1048575, 1048575);
+            cho_b(1)[idx] = clampi(FX_HC(2, *r, -1048575, 1048575), -1048575, 1048575);
+            p--;
+        }
         cho_w += fxc_e - fxc_o;
-        cho_b[-1] = cho_b[1023]; cho_b[1024] = cho_b[0]; cho_b[1025] = cho_b[1];
+        cho_b(0)[-1] = cho_b(0)[511]; cho_b(0)[512] = cho_b(0)[0]; cho_b(0)[513] = cho_b(0)[1];
+        cho_b(1)[-1] = cho_b(1)[511]; cho_b(1)[512] = cho_b(1)[0]; cho_b(1)[513] = cho_b(1)[1];
     }
     for (sb = fxc_o; sb < fxc_e; sb += 32u) {
         int32_t el, er;
         cho_swq += clampi((sw << 8) - cho_swq, -CHO_SWS, CHO_SWS);
-        el = cho_pos(cp_ph + inc * 32u, cho_swq); er = cho_pos(cp_ph + inc * 32u + 0x40000000u, cho_swq);
+        el = cho_pos(cp_ph + inc * 32u, cho_swq); er = cho_pos(cp_ph + inc * 32u + 0x80000000u, cho_swq);
         int32_t sl = el - cho_el, sr = er - cho_er;
         int32_t mix = cho_km + clampi(mt - cho_km, -CHO_KMS, CHO_KMS), cg;
         cg = (mix * CHO_MKF >> 14) + (((mix * (16384 - mix)) >> 14) * CHO_HMK >> 3);   /* (as the one-chunk form: CHO_MKF) */
@@ -1590,8 +1606,8 @@ static void fx_chorus(int32_t *L, int32_t *R, uint32_t n)   /* (in fx_delay's fu
         cho_el = el; cho_er = er; cho_km = mix; cho_cg = cg;
         cp_ph += inc * 32u;
     }
-    cho_hl[0] = FR_FAR(cho_side)(L + fxc_o, cho_k[0] + (fxc_o >> 5), fxc_e - fxc_o, cho_hl[0], &cho_ly[0]);
-    cho_hl[1] = FR_FAR(cho_side)(R + fxc_o, cho_k[1] + (fxc_o >> 5), fxc_e - fxc_o, cho_hl[1], &cho_ly[1]);
+    cho_hl[0] = FR_FAR(cho_side)(L + fxc_o, cho_b(0), cho_k[0] + (fxc_o >> 5), fxc_e - fxc_o, cho_hl[0], &cho_ly[0]);
+    cho_hl[1] = FR_FAR(cho_side)(R + fxc_o, cho_b(1), cho_k[1] + (fxc_o >> 5), fxc_e - fxc_o, cho_hl[1], &cho_ly[1]);
     xf_post_c(L, R, xf_d[0], xf_d[1], n, cho_xw, w1);
     if (FXC_Z) cho_xw = w1;
 #else
@@ -1600,39 +1616,35 @@ static void fx_chorus(int32_t *L, int32_t *R, uint32_t n)   /* (in fx_delay's fu
     if (!cho_run) { memset(cho_buf, 0, sizeof cho_buf); cho_hl[0] = cho_hl[1] = cho_ly[0] = cho_ly[1] = 0; cho_fill = 2; cho_run = 1; cho_km = mt; }
                                                         /* (from rest: the line held what it held when it stopped;
                                                          * cleared, then two blocks dry while it fills: the taps read
-                                                         * 153 .. 465 samples back; the mix at once: it is faded in) */
+                                                         * 250 .. 410 samples back; the mix at once: it is faded in) */
     w1 = xf_pre(cho_xw, on && !cho_fill, L, R, n, XF_STEP_CP);     /* (filling: cho_xw is 0, it stays 0) */
     if (cho_fill) cho_fill--;
     if (cho_el < 0) {                                   /* (the taps' start) */
         cho_swq = sw << 8;
-        cho_el = cho_pos(cp_ph, cho_swq); cho_er = cho_pos(cp_ph + 0x40000000u, cho_swq);
+        cho_el = cho_pos(cp_ph, cho_swq); cho_er = cho_pos(cp_ph + 0x80000000u, cho_swq);
     }
-    {   /* the line for the whole block first (written backwards: sample w at -w), then each side's taps: a tap reads
-         * 153 .. 465 samples back, all written by then and none overwritten (the ring holds 1024) */
+    {   /* the stereo lines for the whole block first (written backwards: sample w at -w), then each side's taps:
+         * a tap reads 250 .. 410 samples back, all written by then and none overwritten (each ring holds 512) */
         uint32_t p = 0u - cho_w;
         const int32_t *l = L, *r = R, *le = L + n;
-        for (; l < le; l++, r++) { cho_b[p & 1023u] = clampi(FX_HC(2, (*l + *r) >> 1, -1048575, 1048575), -1048575, 1048575); p--; }
+        for (; l < le; l++, r++) {
+            uint32_t idx = p & 511u;
+            cho_b(0)[idx] = clampi(FX_HC(2, *l, -1048575, 1048575), -1048575, 1048575);
+            cho_b(1)[idx] = clampi(FX_HC(2, *r, -1048575, 1048575), -1048575, 1048575);
+            p--;
+        }
         cho_w += n;
-        cho_b[-1] = cho_b[1023]; cho_b[1024] = cho_b[0]; cho_b[1025] = cho_b[1];
+        cho_b(0)[-1] = cho_b(0)[511]; cho_b(0)[512] = cho_b(0)[0]; cho_b(0)[513] = cho_b(0)[1];
+        cho_b(1)[-1] = cho_b(1)[511]; cho_b(1)[512] = cho_b(1)[0]; cho_b(1)[513] = cho_b(1)[1];
     }
     int32_t mv = 0;                                     /* (a sub-block's mix or make-up moves: cho_side) */
     for (sb = 0; sb < n; sb += 32u) {
-        /* the taps glide sample by sample to the next sub-block's (they jumped once per 32 samples: a step in the
-         * delay time, a zipper on the chorus' output of ~10x the signal's third difference, 2026-10-24); each sub-block
-         * starts where the last one ended (it started from this DEPTH's position: each DEPTH step made the tap jump,
-         * up to 1.2 samples, the audit 2026-10-25) */
         int32_t el, er;
         cho_swq += clampi((sw << 8) - cho_swq, -CHO_SWS, CHO_SWS);   /* (held: sw << 8, the same taps as before) */
-        el = cho_pos(cp_ph + inc * 32u, cho_swq); er = cho_pos(cp_ph + inc * 32u + 0x40000000u, cho_swq);
+        el = cho_pos(cp_ph + inc * 32u, cho_swq); er = cho_pos(cp_ph + inc * 32u + 0x80000000u, cho_swq);
         int32_t sl = el - cho_el, sr = er - cho_er;     /* per sample, in Q13 (x 32: the 32 steps add up exactly) */
         int32_t mix = cho_km + clampi(mt - cho_km, -CHO_KMS, CHO_KMS), cg;
-        cg = (mix * CHO_MKF >> 14) + (((mix * (16384 - mix)) >> 14) * CHO_HMK >> 3);   /* + half-mix comb; the gain is
-                                                         * 1 + cg / 32768 (cg < 7600: l * cg fits up to |l| 282000; l * the
-                                                         * whole gain overflowed from |l| 61856: a hot chord, fuzz 2390;
-                                                         * the largest, 7028 at mix 11472) */
-        /* the tap I + F (Q13) behind the sub-block's first sample (w, at -w) sits at -w + I: one Q13 position per
-         * tap, (-w << 13) + d, gives the index (its bits 13..22) and the fraction (bits 3..12) and steps by s - 8192
-         * a sample */
+        cg = (mix * CHO_MKF >> 14) + (((mix * (16384 - mix)) >> 14) * CHO_HMK >> 3);
         uint32_t p = 0u - (cho_w - n + sb);
         cho_k_t *kl = &cho_k[0][sb >> 5], *kr = &cho_k[1][sb >> 5];
         kl->v = (p << 13) + ((uint32_t)cho_el << 5); kr->v = (p << 13) + ((uint32_t)cho_er << 5);
@@ -1644,11 +1656,11 @@ static void fx_chorus(int32_t *L, int32_t *R, uint32_t n)   /* (in fx_delay's fu
         cp_ph += inc * 32u;
     }
     if (mv) {                                           /* (DEPTH moving: the ramps, from flash) */
-        cho_hl[0] = FR_FAR2(cho_side)(L, cho_k[0], n, cho_hl[0], &cho_ly[0]);
-        cho_hl[1] = FR_FAR2(cho_side)(R, cho_k[1], n, cho_hl[1], &cho_ly[1]);
+        cho_hl[0] = FR_FAR2(cho_side)(L, cho_b(0), cho_k[0], n, cho_hl[0], &cho_ly[0]);
+        cho_hl[1] = FR_FAR2(cho_side)(R, cho_b(1), cho_k[1], n, cho_hl[1], &cho_ly[1]);
     } else {
-        cho_hl[0] = FR_FAR(cho_side_k)(L, cho_k[0], n, cho_hl[0], &cho_ly[0]);
-        cho_hl[1] = FR_FAR(cho_side_k)(R, cho_k[1], n, cho_hl[1], &cho_ly[1]);
+        cho_hl[0] = FR_FAR(cho_side_k)(L, cho_b(0), cho_k[0], n, cho_hl[0], &cho_ly[0]);
+        cho_hl[1] = FR_FAR(cho_side_k)(R, cho_b(1), cho_k[1], n, cho_hl[1], &cho_ly[1]);
     }
     xf_post(L, R, xf_d[0], xf_d[1], n, cho_xw, w1);
     cho_xw = w1;
@@ -2113,6 +2125,15 @@ FX_RAM __attribute__((noinline)) static void dly_ramp(int32_t *m, uint32_t n, in
  * by sample from the last block's dly_sgk (a step once per block put a one-sample step into the echoes, one delay time
  * after each block boundary, whenever L != R: up to ~700 LSB on VIBES with the chorus; equal ends: the old send, bit
  * for bit); dgt: the dry's gain it eases to. */
+/* stereo ping-pong right tap at half delay (d >= 512<<8), ~0.85x, respecting clean-span c */
+__attribute__((noinline)) static int32_t dly_tap_r(uint32_t w, int32_t d, uint32_t c, int rst)
+{
+    int32_t dR = d >> 1, a0, a1;
+    uint32_t iR = (w - (uint32_t)(dR >> 8)) & (DLY_LEN - 1u), lbR = (w - iR) & (DLY_LEN - 1u);
+    a0 = (!rst || c > DLY_LEN || ((lbR - 1u) & (DLY_LEN - 1u)) < c) ? dly_buf[iR] : 0;
+    a1 = (!rst || c > DLY_LEN || (lbR & (DLY_LEN - 1u)) < c) ? dly_buf[(iR - 1u) & (DLY_LEN - 1u)] : 0;
+    return (int32_t)(((int64_t)((a0 + (((a1 - a0) * (dR & 255)) >> 8)) << 1) * 27852) >> 15);
+}
 static inline __attribute__((always_inline)) void dly_loop(int32_t *L, int32_t *R, uint32_t n, const int tape,
                                                            const int32_t msk, int32_t sg16, int32_t target, int32_t col,
                                                            int32_t fb, int32_t wet, int32_t dgt, const int rst,
@@ -2139,7 +2160,7 @@ static inline __attribute__((always_inline)) void dly_loop(int32_t *L, int32_t *
             dly_dt[j] = dd + (int32_t)(((int64_t)dd * (osc_sine(wow) * 3 + sf)) >> 25);
         }
     for (j = 0; j < n; j++) {
-        int32_t d, r, in = dly_m[j] & msk, f;          /* (the send, ramped: dly_ramp) */
+        int32_t d, r, rR, in = dly_m[j] & msk, f;          /* (the send, ramped: dly_ramp) */
         uint32_t i;
         if (tape)
             d = dly_dt[j];
@@ -2157,11 +2178,12 @@ static inline __attribute__((always_inline)) void dly_loop(int32_t *L, int32_t *
                 int32_t a1 = (lb & (DLY_LEN - 1u)) < c ? dly_buf[(i - 1u) & (DLY_LEN - 1u)] : 0;
                 r = (a0 + (((a1 - a0) * (d & 255)) >> 8)) << 1;
             }
-            c++;
         } else if (tape)                                 /* (c stays > DLY_LEN: no need to count on) */
             r = DLY_H4(i, d & 255);
         else
             r = (dly_buf[i] + (((dly_buf[(i - 1u) & (DLY_LEN - 1u)] - dly_buf[i]) * (d & 255)) >> 8)) << 1;
+        rR = d >= (512 << 8) ? FR_FAR(dly_tap_r)(w, d, c, rst) : r;
+        if (rst && c <= DLY_LEN) c++;
         lp += (int32_t)(((int64_t)(r - lp) * kcol) >> 15);   /* (r - lp reaches 2^17 on a full-scale swing) */
         f = !tape ? lp : kb ? fx_sck_k(lp, ek, eg) : softclip(lp);   /* (kb: the bars, dly_loop_kb) */
         hp += (f - hp + 64) >> 7;
@@ -2171,8 +2193,9 @@ static inline __attribute__((always_inline)) void dly_loop(int32_t *L, int32_t *
         w++;
         wq += ws;
         r = (int32_t)(((int64_t)r * (wq >> 8)) >> 15);   /* (64 bits: the 4-point read overshoots 2^16, c1-int) */
+        rR = (int32_t)(((int64_t)rR * (wq >> 8)) >> 15);
         DLY_DG_STEP(dg, dgt);
-        L[j] = (int32_t)(((int64_t)L[j] * dg) >> 15) + r; R[j] = (int32_t)(((int64_t)R[j] * dg) >> 15) + r;
+        L[j] = (int32_t)(((int64_t)L[j] * dg) >> 15) + r; R[j] = (int32_t)(((int64_t)R[j] * dg) >> 15) + rR;
     }
     dly_w = w; dly_wow = wow; dly_flt = flt; dly_d = dd; dly_lp = lp; dly_hp = hp; dly_dg = dg; dly_sgk = msk ? sg16 : 0;
 }
@@ -2952,11 +2975,17 @@ FX_RAM __attribute__((noinline)) static void fx_spread(const int32_t *mono, int3
         {
             int32_t *l = L + sb, *r = R + sb, *le = L + e, k = sp_g;
             const int32_t *sd = side + sb;
+            int pan = TWP(FXP_TW_SW) == 1 && TWP(FXP_TW_MODE) == 0;
             while (l < le) {
                 int32_t s;
                 k += dg;
                 s = (int32_t)(((int64_t)*sd++ * k) >> 15);
-                *l++ += s; *r++ -= s;
+                if (pan) {
+                    *l++ += (int32_t)(((int64_t)s * tw_gl) >> 15);
+                    *r++ -= (int32_t)(((int64_t)s * tw_gr) >> 15);
+                } else {
+                    *l++ += s; *r++ -= s;
+                }
             }
         }
         sp_g = g;
