@@ -538,10 +538,10 @@ static void p_out(frp_plugin_t *p, const clap_output_events_t *out)
         double v, was;
         v = i < FRP_NPARAM_APP ? sn.pv[i] : FRP_PARAMS[i].id == FRP_ID_TUNE ? sn.tune : FRP_PARAMS[i].id == FRP_ID_PRESET ?
             sn.last_fact : FRP_PARAMS[i].id == FRP_ID_SUSTAIN ? sn.sustain : FRP_PARAMS[i].id == FRP_ID_VRESP ? sn.vresp :
-            sn.bypass;
+            FRP_PARAMS[i].id == FRP_ID_VCURVE ? sn.vcurve : sn.bypass;
         was = i < FRP_NPARAM_APP ? p->last.pv[i] : FRP_PARAMS[i].id == FRP_ID_TUNE ? p->last.tune :
               FRP_PARAMS[i].id == FRP_ID_PRESET ? p->last.last_fact : FRP_PARAMS[i].id == FRP_ID_SUSTAIN ? p->last.sustain :
-              FRP_PARAMS[i].id == FRP_ID_VRESP ? p->last.vresp : p->last.bypass;
+              FRP_PARAMS[i].id == FRP_ID_VRESP ? p->last.vresp : FRP_PARAMS[i].id == FRP_ID_VCURVE ? p->last.vcurve : p->last.bypass;
         if (!p->have_last || v == was || v == p->host_view[i]) continue;
         if (out_push(out, OQ_VALUE, FRP_PARAMS[i].id, v)) p->host_view[i] = v;
     }

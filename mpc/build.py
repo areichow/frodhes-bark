@@ -45,7 +45,7 @@ SDK_URL = "https://github.com/inmusic-software/mpc-plugin-builder-sdk"
 SDK_HEADERS = ("mpc_plugin.h", "mpc_vst2_abi.h", "mpc_resources.h")
 ZIG_SERIES = "0.15."                     # the zig the build was checked with (another version: a warning)
 SLOTS = 16                               # plugin/src/bridge.h FRP_SLOTS
-FOLDER = "Frodhes - VST - Frodhes"       # "<manufacturer> - VST - <name>" (mpc/plugin.json, frodhes_mpc.cpp)
+FOLDER = "Frodhes-Bark - VST - Frodhes-Bark"   # "<manufacturer> - VST - <name>" (mpc/plugin.json, frodhes_mpc.cpp)
 SLUG = "frodhes"
 IS_MAC = sys.platform == "darwin"
 

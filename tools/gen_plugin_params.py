@@ -106,12 +106,13 @@ FMTS = ["F_R10", "F_ENUM", "F_HZ", "F_MS", "F_DIV", "F_BIP", "F_DB", "F_THR", "F
 # the plugin's own parameters: (id, C name, long name, group, values, default)
 # (the PRESET texts come from the app: dump()'s factory names)
 # (0x10000: ENGINE until the plugin became HQ only; reserved)
-OWN0, OWN_SPAN = 0x10000, 6
+OWN0, OWN_SPAN = 0x10000, 7
 OWN = [(0x10001, "FRP_ID_TUNE", "Tune", "Voice", [f"{c:+d} c" if c else "0 c" for c in range(-50, 51)], 50),
        (0x10002, "FRP_ID_PRESET", "Preset", "Preset", None, 0),
        (0x10003, "FRP_ID_SUSTAIN", "Sustain", "Performance", ["OFF", "ON"], 0),
        (0x10004, "FRP_ID_FX_BYPASS", "Effects bypass", "Performance", ["OFF", "ON"], 0),
-       (0x10005, "FRP_ID_VRESP", "Velocity response", "Voice", "VRESP", 0)]   # (0.9.10: the settings' RESPONSE)
+       (0x10005, "FRP_ID_VRESP", "Velocity response", "Voice", "VRESP", 0),   # (0.9.10: the settings' RESPONSE)
+       (0x10006, "FRP_ID_VCURVE", "Velocity curve", "Voice", ["LIN", "BARK", "HVY", "LGT", "SOFT"], 0)]
 
 
 def vresp_names():
@@ -157,7 +158,7 @@ def dump():
             q = ln.split(" ", 2)
             assert int(q[1]) == len(fact)
             fact.append(f"F{len(fact) + 1:02d} {q[2] if len(q) > 2 else ''}".strip())
-    assert n == len(params) and all(len(text[d["id"]]) == d["hi"] + 1 for d in params) and len(fact) == 57
+    assert n == len(params) and all(len(text[d["id"]]) == d["hi"] + 1 for d in params) and len(fact) == 69
     return params, text, fact
 
 

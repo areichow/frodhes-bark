@@ -56,9 +56,9 @@ int versionNumber()
 mpc::PluginInfo makeInfo()
 {
     mpc::PluginInfo info;
-    info.name = "Frodhes";
-    info.vendor = "Frodhes";                         /* the desktop plugin's vendor (frodhes_clap.c DESC) */
-    info.uniqueId = MPC_FOURCC('F', 'r', 'd', '1');  /* = mpc/plugin.json "uid"; never change it */
+    info.name = "Frodhes-Bark";
+    info.vendor = "Frodhes-Bark";                    /* distinct from stock Frodhes so both can coexist */
+    info.uniqueId = MPC_FOURCC('F', 'r', 'd', 'B');  /* = mpc/plugin.json "uid" */
     info.version = versionNumber();
     info.isInstrument = true;
     info.numInputs = 0;
@@ -237,7 +237,8 @@ private:
     {
         uint32_t id = FRP_PARAMS[i].id;
         return i < (int)FRP_NPARAM_APP ? s.pv[i] : id == FRP_ID_TUNE ? s.tune : id == FRP_ID_PRESET ? s.last_fact :
-               id == FRP_ID_SUSTAIN ? s.sustain : id == FRP_ID_VRESP ? s.vresp : s.bypass;
+               id == FRP_ID_SUSTAIN ? s.sustain : id == FRP_ID_VRESP ? s.vresp :
+               id == FRP_ID_VCURVE ? s.vcurve : s.bypass;
     }
     /* the app's own changes into the host's values (frodhes_clap.c p_out: a value that moved and is not what the host
      * last wrote); while forcing (after a state or a program), every value the app holds */

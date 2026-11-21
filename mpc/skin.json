@@ -15,7 +15,7 @@
           { "param": "Noise", "label": "NOISE" },
           { "param": "Tune", "label": "TUNE", "bi": true } ] } ] },
       { "name": "PLAY", "panels": [
-        { "title": "INSTRUMENT", "cards": [
+        { "title": "INSTRUMENT", "menu": "Velocity curve", "menuCaption": "CURVE", "cards": [
           { "param": "Type", "label": "TYPE" },
           { "param": "Velocity response", "label": "RESPONSE" },
           { "param": "Stereo spread", "label": "SPREAD" },

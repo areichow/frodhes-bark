@@ -259,7 +259,7 @@ def page_script(page, out):
     s += "plate 0 0 %s %s %s %s %s\n" % (L(W), L(H), L(R_OUT), L(FRAME), L(RAIL))
     # the rail: the wordmark cut into the metal and its pilot lamp; the page's name and place on the right
     cy = RAIL / 2 + 1
-    s += fonts_text(1, (13.0, 400, 3.0), "l", 40, cy, C_ENGR, "FRODHES", eng=1)
+    s += fonts_text(1, (13.0, 400, 3.0), "l", 40, cy, C_ENGR, "FRODHES-BARK", eng=1)
     s += "pilot +15 %s\n" % L(cy)                     # (after the last text's end)
     right = W - 40
     if page["nsub"] > 1:

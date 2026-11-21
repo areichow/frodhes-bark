@@ -6,8 +6,8 @@
  * the FM-1 image. */
 #ifndef MOVE_PRESETS_H
 #define MOVE_PRESETS_H
-#define MB_PX_N 38u                       /* F20.. */
-#define MB_PX_FIRST 20u                   /* the first one's number (F20) */
+#define MB_PX_N 38u                       /* F32.. */
+#define MB_PX_FIRST 32u                   /* the first one's number (F32, follows PR_NF = 31) */
 #define MB_PX_REC 127u                    /* bytes a record: the pairs, then 0xFF */
 /* the ids as the records were read back (params.c's ids are append-only) */
 _Static_assert(P_TYPE == 0 && P_DRIVE == 1 && P_TW_SW == 2 && P_TW_DEPTH == 3, "params.c ids");

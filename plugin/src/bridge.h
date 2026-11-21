@@ -39,7 +39,7 @@
 #define FRP_BASE_N 80u                   /* params.c P_SLOTS */
 #define FRP_STATE_MAX 2048               /* the state's JSON text (slot_bridge.h SB_STATE_N) */
 #define FRP_PNAME 32                     /* a preset name with its terminator */
-#define FRP_NFACTORY 57u                 /* F01..F19 (presets.c) + F20..F57 (move/move_presets.h) */
+#define FRP_NFACTORY 69u                 /* F01..F31 (presets.c) + F32..F69 (move/move_presets.h) */
 #ifndef FRP_VOICES                       /* (the Akai MPC port builds its slots at 16: mpc/build.py) */
 #define FRP_VOICES 24u                   /* every slot's voice count, every engine (slots.cmake FR_VOICES) */
 #endif
@@ -61,6 +61,7 @@ typedef struct {
     uint8_t active, held;                /* the voices sounding now, and of them the ones whose key is down */
     uint8_t tune;                        /* TUNE + 50 (0..100) */
     uint8_t vresp;                       /* the settings' RESPONSE, the velocity response (params.c N_VRESP) */
+    uint8_t vcurve;                      /* the 6-point velocity curve preset (params.c VC_PRESETS: 0..4) */
     uint8_t sustain, bypass;             /* the dampers held off; every effect bypassed */
     uint8_t edited, can_undo, quiet;     /* the sound differs from its preset; an undo copy exists; nothing sounds */
     int16_t pidx, last_fact;             /* the preset playing (0..56 factory, -1 a user file / none); the last factory */

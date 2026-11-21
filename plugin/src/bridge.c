@@ -438,7 +438,8 @@ int frp_inst_get(const frp_inst_t *in, uint32_t id, double *value)
     if (!in->s) { *value = FRP_PARAMS[i].def; return 0; }
     in->s->snapshot(&sn);
     *value = id < FRP_NPARAM_APP ? sn.pv[id] : id == FRP_ID_TUNE ? sn.tune : id == FRP_ID_PRESET ? sn.last_fact :
-             id == FRP_ID_SUSTAIN ? sn.sustain : id == FRP_ID_VRESP ? sn.vresp : sn.bypass;
+             id == FRP_ID_SUSTAIN ? sn.sustain : id == FRP_ID_VRESP ? sn.vresp :
+             id == FRP_ID_VCURVE ? sn.vcurve : sn.bypass;
     return 0;
 }
 int frp_inst_state_get(const frp_inst_t *in, char *buf, int n) { return in->s ? in->s->state_get(buf, n) : -1; }

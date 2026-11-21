@@ -1,16 +1,16 @@
 {
-  "name": "Frodhes",
-  "manufacturer": "Frodhes",
-  "version": "0.0.0-dev",
+  "name": "Frodhes-Bark",
+  "manufacturer": "Frodhes-Bark",
+  "version": "1961",
   "format": "vst2",
   "kind": "instrument",
-  "uid": "Frd1",
+  "uid": "FrdB",
   "numInputs": 0,
   "numOutputs": 2,
   "category": "Synth",
   "file32": "frodhes-arm32.so",
   "file64": "frodhes-arm64.so",
-  "description": "Physical-model electric piano, vibraphone and marimba: the Frodhes engine (HQ, 16 voices) with its effects.",
-  "url": "https://github.com/leonardoMirabal/frodhes",
+  "description": "Physical-model Rhodes (Stage 73 bark), Wurlitzer 140B/200A, vibraphone and marimba: the Frodhes-Bark engine (HQ, 16 voices) with velocity curves and effects.",
+  "url": "https://github.com/areichow/frodhes-bark",
   "license": "GPL-3.0-only"
 }

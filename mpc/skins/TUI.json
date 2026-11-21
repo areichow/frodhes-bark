@@ -282,6 +282,82 @@
                     }
                 },
                 {
+                    "key": "header menu",
+                    "value": {
+                        "version": 2,
+                        "actions": [
+                            {
+                                "version": 1,
+                                "onAction": "Mouse Down",
+                                "handler": "Show Overlay",
+                                "handleName": "Data",
+                                "additionalData": "menu overlay"
+                            },
+                            {
+                                "version": 1,
+                                "onAction": "Enter Pressed",
+                                "handler": "Show Overlay",
+                                "handleName": "Data",
+                                "additionalData": "menu overlay"
+                            }
+                        ],
+                        "backgroundData": {
+                            "version": 1,
+                            "focussed": {
+                                "version": 1,
+                                "colour": "00000000",
+                                "image": ""
+                            },
+                            "unfocussed": {
+                                "version": 1,
+                                "colour": "00000000",
+                                "image": ""
+                            }
+                        },
+                        "ignoreMousePresses": false,
+                        "disableCoarseDataWheel": false,
+                        "componentsData": [
+                            {
+                                "version": 2,
+                                "componentData": {
+                                    "version": 1,
+                                    "name": "value",
+                                    "type": "Label",
+                                    "data": {
+                                        "version": 1,
+                                        "textStyle": {
+                                            "version": 1,
+                                            "font": {
+                                                "version": 1,
+                                                "name": "Roboto",
+                                                "style": "Regular",
+                                                "height": 22.0
+                                            },
+                                            "colour": "ffeeede8",
+                                            "justification": "right verticallyCentred",
+                                            "case": "Original"
+                                        },
+                                        "type": "Value",
+                                        "handleName": "Data"
+                                    }
+                                },
+                                "handle remapping": {
+                                    "version": 1,
+                                    "map": []
+                                },
+                                "bounds": {
+                                    "version": 1,
+                                    "acceptsHWFocus": "No",
+                                    "showWhenDataModelInvalid": "Show",
+                                    "whenVisible": "Always",
+                                    "boundsType": "Absolute",
+                                    "bounds": "80 0 92 40"
+                                }
+                            }
+                        ]
+                    }
+                },
+                {
                     "key": "card knob uni menu",
                     "value": {
                         "version": 2,
@@ -896,82 +972,6 @@
                                     "whenVisible": "Always",
                                     "boundsType": "Absolute",
                                     "bounds": "152 78 128 64"
-                                }
-                            }
-                        ]
-                    }
-                },
-                {
-                    "key": "header menu",
-                    "value": {
-                        "version": 2,
-                        "actions": [
-                            {
-                                "version": 1,
-                                "onAction": "Mouse Down",
-                                "handler": "Show Overlay",
-                                "handleName": "Data",
-                                "additionalData": "menu overlay"
-                            },
-                            {
-                                "version": 1,
-                                "onAction": "Enter Pressed",
-                                "handler": "Show Overlay",
-                                "handleName": "Data",
-                                "additionalData": "menu overlay"
-                            }
-                        ],
-                        "backgroundData": {
-                            "version": 1,
-                            "focussed": {
-                                "version": 1,
-                                "colour": "00000000",
-                                "image": ""
-                            },
-                            "unfocussed": {
-                                "version": 1,
-                                "colour": "00000000",
-                                "image": ""
-                            }
-                        },
-                        "ignoreMousePresses": false,
-                        "disableCoarseDataWheel": false,
-                        "componentsData": [
-                            {
-                                "version": 2,
-                                "componentData": {
-                                    "version": 1,
-                                    "name": "value",
-                                    "type": "Label",
-                                    "data": {
-                                        "version": 1,
-                                        "textStyle": {
-                                            "version": 1,
-                                            "font": {
-                                                "version": 1,
-                                                "name": "Roboto",
-                                                "style": "Regular",
-                                                "height": 22.0
-                                            },
-                                            "colour": "ffeeede8",
-                                            "justification": "right verticallyCentred",
-                                            "case": "Original"
-                                        },
-                                        "type": "Value",
-                                        "handleName": "Data"
-                                    }
-                                },
-                                "handle remapping": {
-                                    "version": 1,
-                                    "map": []
-                                },
-                                "bounds": {
-                                    "version": 1,
-                                    "acceptsHWFocus": "No",
-                                    "showWhenDataModelInvalid": "Show",
-                                    "whenVisible": "Always",
-                                    "boundsType": "Absolute",
-                                    "bounds": "80 0 92 40"
                                 }
                             }
                         ]
@@ -2138,7 +2138,9 @@
                     "EARLY FELT",
                     "BELL DYNO",
                     "VIBES",
-                    "MARIMBA"
+                    "MARIMBA",
+                    "WURLI 140B",
+                    "WURLI 200A"
                 ]
             },
             {
@@ -2420,68 +2422,6 @@
                 ]
             },
             {
-                "key": "Parameter 68",
-                "value": [
-                    "F01 STAGE 77",
-                    "F02 SUITCASE",
-                    "F03 EARLY FELT",
-                    "F04 BELL DYNO",
-                    "F05 WARM 77",
-                    "F06 PUNCH 77",
-                    "F07 BALLAD",
-                    "F08 SUIT TREM",
-                    "F09 70S PHASER",
-                    "F10 FUNK WAH",
-                    "F11 RESO SWEEP",
-                    "F12 LUSH CHO",
-                    "F13 VIBES",
-                    "F14 VIBES ECHO",
-                    "F15 MARIMBA",
-                    "F16 WOOD ECHO",
-                    "F17 TAPE ECHO",
-                    "F18 DREAM",
-                    "F19 WARM DRIVE",
-                    "F20 STAGE77 ECHO",
-                    "F21 STAGE77 TAPE",
-                    "F22 SUITCASE DRY",
-                    "F23 SUITCASE AMP",
-                    "F24 FELT HALL",
-                    "F25 FELT ECHO",
-                    "F26 BELL SOFT",
-                    "F27 BELL ECHO",
-                    "F28 WARM77 FAT",
-                    "F29 WARM77 ECHO",
-                    "F30 VINTAGE 77",
-                    "F31 PUNCH TAPE",
-                    "F32 BALLAD TIGHT",
-                    "F33 BALLAD DARK",
-                    "F34 TREM ECHO",
-                    "F35 TREM DEEP",
-                    "F36 PHASER LVL",
-                    "F37 PHASER SLOW",
-                    "F38 FUNK WAH LVL",
-                    "F39 FUNK PLUCK",
-                    "F40 RESO SPACE",
-                    "F41 RESO SMOOTH",
-                    "F42 LUSH SOFT",
-                    "F43 LUSH DARK",
-                    "F44 VIBES HALL",
-                    "F45 VIBES MOTOR",
-                    "F46 VIBES CLEAN",
-                    "F47 VIBES DRIFT",
-                    "F48 MARIMBA HALL",
-                    "F49 MARIMBA ECHO",
-                    "F50 WOOD PLAIN",
-                    "F51 WOOD LIGHT",
-                    "F52 TAPE WIDE",
-                    "F53 TAPE DARK",
-                    "F54 DREAM CLEAR",
-                    "F55 DREAM DEEP",
-                    "F56 DRIVE SOFT",
-                    "F57 DRIVE BODY"
-                ]
-            },
-            {
                 "key": "Parameter 69",
                 "value": [
                     "OFF",
@@ -2500,6 +2440,16 @@
                 "value": [
                     "FULL",
                     "LIGHT"
+                ]
+            },
+            {
+                "key": "Parameter 72",
+                "value": [
+                    "LIN",
+                    "BARK",
+                    "HVY",
+                    "LGT",
+                    "SOFT"
                 ]
             }
         ],
@@ -2845,6 +2795,35 @@
                                 "whenVisible": "Always",
                                 "boundsType": "Absolute",
                                 "bounds": "0 0 1280 628"
+                            }
+                        },
+                        {
+                            "version": 2,
+                            "componentData": {
+                                "version": 1,
+                                "name": "Velocity curve",
+                                "type": "header menu",
+                                "data": {
+                                    "version": 1,
+                                    "handleName": "Data"
+                                }
+                            },
+                            "handle remapping": {
+                                "version": 1,
+                                "map": [
+                                    {
+                                        "key": "Data",
+                                        "value": "Parameter 72"
+                                    }
+                                ]
+                            },
+                            "bounds": {
+                                "version": 1,
+                                "acceptsHWFocus": "No",
+                                "showWhenDataModelInvalid": "Hide",
+                                "whenVisible": "Always",
+                                "boundsType": "Absolute",
+                                "bounds": "1008 64 216 40"
                             }
                         },
                         {

@@ -44,10 +44,10 @@
 #define SB_MAP_DEFAULT_HEX "00007f00007f"   /* the Move state's "map" (move_bridge.h MB_MAP_DEFAULT: every mapping off) */
 #define SB_PX_BASE (PR_NF + PR_NU)       /* the app's index of F20 (move_bridge.h MB_PX_BASE) */
 #define SB_NFACT (PR_NF + MB_PX_N)       /* the factory presets: 57 */
-#define SB_NOWN 6u                       /* the plugin's own parameters (params_map.h, ids 0x10000 + k) */
+#define SB_NOWN 7u                       /* the plugin's own parameters (params_map.h, ids 0x10000 + k) */
 #define SB_LEARN_OWN 200u                /* a learned own parameter's code: 200 + k (the app's ids are < P_COUNT) */
-_Static_assert(SB_NFACT == FRP_NFACTORY, "bridge.h FRP_NFACTORY: F01..F19 + F20..F57");
-_Static_assert(MB_PX_FIRST == PR_NF + 1u && SB_PX_BASE == 35u, "move_presets.h follows presets.c (F20 = index 35)");
+_Static_assert(SB_NFACT == FRP_NFACTORY, "bridge.h FRP_NFACTORY: F01..F31 + F32..F69");
+_Static_assert(MB_PX_FIRST == PR_NF + 1u && SB_PX_BASE == 47u, "move_presets.h follows presets.c (F32 = index 47)");
 _Static_assert(P_COUNT <= FRP_NPARAM_APP && P_COUNT < SB_LEARN_OWN, "the learn codes");
 
 typedef struct { uint8_t kind, x; uint32_t at, a; int32_t v; } sb_ev_t;   /* x: at is an app frame x 256 (exact) */
@@ -165,6 +165,7 @@ static void sb_publish(void)
     }
     sb.pub.tune = (uint8_t)(set.tune + 50);
     sb.pub.vresp = set.vel_resp;
+    { uint32_t vc = vcurve_preset_idx(); sb.pub.vcurve = (uint8_t)(vc < VC_NPRESET ? vc : 0u); }
     sb.pub.sustain = (uint8_t)(sus_held || sus_latched || sus_midi >= 64u);
     sb.pub.bypass = fx_bypass;
     sb.pub.edited = (uint8_t)ed;
@@ -534,10 +535,11 @@ static void sb_own_abs(uint32_t k, int32_t x)
     else if (k == FRP_ID_FX_BYPASS - FRP_ID_OWN0) midi_cc(111u, x ? 127u : 0u);  /* the FX button: as its CC 111 */
     else if (k == FRP_ID_VRESP - FRP_ID_OWN0) vresp_set(x < 0 ? 0u : (uint32_t)x);   /* RESPONSE (ui.c S_VRESP; the
                                                                                    * next strike) */
+    else if (k == FRP_ID_VCURVE - FRP_ID_OWN0) { vcurve_load_preset(x < 0 ? 0u : (uint32_t)x); set_dirty = 1; }
 }
 static int32_t sb_code_hi(uint32_t c)    /* a learn code's range */
 {
-    static const uint8_t OWN_HI[SB_NOWN] = { 0, 100, SB_NFACT - 1u, 1, 1, VRESP_N - 1u };
+    static const uint8_t OWN_HI[SB_NOWN] = { 0, 100, SB_NFACT - 1u, 1, 1, VRESP_N - 1u, VC_NPRESET - 1u };
     return c < P_COUNT ? PARAMS[c].hi : c >= SB_LEARN_OWN && c < SB_LEARN_OWN + SB_NOWN ? OWN_HI[c - SB_LEARN_OWN] : 0;
 }
 static void sb_code_abs(uint32_t c, int32_t x)
