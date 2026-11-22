@@ -188,8 +188,8 @@ static const uint8_t PR_FDATA[] = {   /* the factory records, one after another:
     P_RV_DEPTH, 16, P_RV_TYPE, 2, P_RV_LOCUT, 80, P_LEVEL, 64, P_DRIVE, 40, P_DRV_SW, 2, P_DRV_TONE, 70, P_CP_SW, 1,
     P_CP_DEPTH, 50, P_CP_SPEED, 36, P_DL_SW, 3, P_DL_DEPTH, 12, P_DL_SYNC, 8, P_DL_FDBK, 30, P_DL_TONE, 56,
     P_TONE, 64, P_BARK, 64, P_BELL, 64, P_HAMMER, 64, P_DECAY, 64, 0xFF,
-    /* F20 WURLI 200A: dry 200A reference (mirrors F01), neutral voicing, glue comp, subtle hall */
-    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 50, P_CMP_RATIO, 1, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
+    /* F20 WURLI 200A: dry 200A reference (mirrors F01), neutral voicing, gentle 1.5:1 glue comp, subtle hall */
+    P_TYPE, 7, P_CMP_SW, 1, P_CMP_AMT, 36, P_CMP_RATIO, 0, P_CMP_ATK, 80, P_CMP_REL, 72, P_CMP_GAIN, 8,
     P_RV_DEPTH, 16, P_RV_TYPE, 1, P_RV_LOCUT, 70, P_LEVEL, 57, 0xFF,
     /* F21 WURLI 140B: warm dry 140B (mirrors F02), gentle 1.5:1 comp, subtle hall */
     P_TYPE, 6, P_NOISE, 44, P_CMP_SW, 1, P_CMP_AMT, 36, P_CMP_RATIO, 0, P_CMP_ATK, 40, P_CMP_REL, 72, P_CMP_GAIN, 8,

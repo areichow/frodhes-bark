@@ -71,8 +71,8 @@ MODEL_PID = {"pro": 0x0007, "elite": 0x0008, "mke": 0x0009}   # the app's USB pr
 DATA_FAMILY = "FRODHES"             # the SMK store's owner tag (store.h): 1..7 of A-Z 0-9
 SCREEN_NAME = "FRODHES-BARK"        # the update loader's screen (FM-1, ldr_screen.c): the name and its colour (RGB565)
 SCREEN_COLOUR = 0xE3C1              # AMBER, the screen's default accent (ui.c COLOR step 0)
-PRODUCT = "FM-1_1965"               # Frodhes-Bark, build 1965 identity
-VERSION = "1965"                    # APP_VER (overridable via --release)
+PRODUCT = "FM-1_1966"               # Frodhes-Bark, build 1966 identity
+VERSION = "1966"                    # APP_VER (overridable via --release)
 
 
 def toolchain():

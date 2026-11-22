@@ -56,24 +56,24 @@ Q30, Q28, Q25, Q16 = 1 << 30, 1 << 28, 1 << 25, 1 << 16
 
 # Electrostatic comb pickup geometry (half-height a, horizontal gap g)
 COMB_A = 1.0
-COMB_G = 0.35
+COMB_G = 0.55
 
 # Deterministic per-key jitter seed
 JIT_SEED = 200
 
-# Modal & voicing curves fitted to .local/wurli/200a/ & .local/ptq-samples/wurli/ acoustic measurements
-T60_V1_PTS = [[21, 14.0], [36, 12.5], [45, 11.5], [60, 7.4], [65, 5.3], [69, 3.1], [84, 2.4], [89, 2.1], [108, 1.0]]
+# Modal & voicing curves fitted to .local/wurli/200a/ acoustic measurements
+T60_V1_PTS = [[21, 12.0], [36, 10.5], [45, 9.5], [60, 5.8], [65, 4.2], [69, 3.1], [84, 2.3], [89, 2.0], [108, 1.0]]
 T60_REL_PTS = [[21, 0.28], [36, 0.22], [45, 0.16], [60, 0.11], [69, 0.10], [84, 0.08], [108, 0.06]]
 O1_RATIO_PTS = [[21, 5.65], [45, 5.85], [60, 6.12], [108, 6.12]]
-T60_O1_PTS = [[21, 0.18], [45, 0.12], [60, 0.07], [72, 0.04], [108, 0.025]]
-O1_WEIGHT_PTS = [[21, 0.16], [45, 0.13], [60, 0.09], [76, 0.05], [108, 0.03]]
+T60_O1_PTS = [[21, 0.11], [45, 0.08], [60, 0.045], [72, 0.028], [108, 0.018]]
+O1_WEIGHT_PTS = [[21, 0.08], [45, 0.065], [60, 0.045], [76, 0.025], [108, 0.015]]
 
-# Register-dependent resting offset z0 (gap units): deeper into comb in bass for thick even+odd growl,
-# transitioning to 0.85 from E3 up for classic odd-dominant Wurlitzer mid-range bark.
-Z0_PTS = [[21, 0.58], [45, 0.58], [48, 0.74], [52, 0.85], [108, 0.85]]
+# Register-dependent resting offset z0 (gap units): near inflection (1.01) in mid/treble for warm woody tone,
+# slightly inside inflection in bass for authentic H3-led growl + H2 warmth on hard strikes.
+Z0_PTS = [[21, 0.86], [45, 0.86], [48, 0.94], [60, 0.96], [72, 0.98], [108, 0.98]]
 
 # Target v127 V1 peak tip excursion (gap units) across registers
-X127_PTS = [[21, 2.15], [45, 2.15], [48, 1.80], [60, 1.35], [72, 0.80], [84, 0.38], [108, 0.25]]
+X127_PTS = [[21, 1.85], [45, 1.85], [48, 1.50], [60, 1.20], [72, 0.78], [84, 0.38], [108, 0.24]]
 
 # Target negative attack pitch dip at v127 (cents) for keys 21..69
 DIP_CENTS_PTS = [[21, 28.0], [41, 28.0], [45, 16.0], [48, 6.0], [60, 2.0], [69, 0.0]]
@@ -89,22 +89,22 @@ PEAK_CAP_DBFS = -6.0
 WU_TYPES = [
     dict(
         name="W140",
-        off=-0.07,
-        bark=0.90,
-        ham=0.85,
-        bell=0.85,
-        rlc=[3800.0, 0.85],
-        body=[["peak", 220.0, 0.75, 2.5], ["hshelf", 4200.0, 0.7, -3.5]],
+        off=-0.02,
+        bark=0.85,
+        ham=0.82,
+        bell=0.78,
+        rlc=[3200.0, 0.75],
+        body=[["peak", 240.0, 0.75, 2.0], ["hshelf", 3500.0, 0.7, -4.0]],
         drive_row=1,
     ),
     dict(
         name="W200",
-        off=0.02,
-        bark=1.12,
-        ham=1.10,
-        bell=1.15,
-        rlc=[5800.0, 1.15],
-        body=[["lshelf", 180.0, 0.7, -2.0], ["peak", 1800.0, 0.85, 3.0]],
+        off=0.00,
+        bark=1.00,
+        ham=1.00,
+        bell=0.95,
+        rlc=[4400.0, 0.85],
+        body=[["lshelf", 180.0, 0.7, -1.0], ["peak", 1600.0, 0.80, 1.5]],
         drive_row=0,
     ),
 ]
@@ -430,15 +430,12 @@ def build():
     # Excursion ratio per V_ANCH [1, 8, 24, 40, 56, 72, 88, 104, 120, 127] relative to v127:
     # Smooth convex-knee curve: low below v48, rising smoothly through v88 (~0.56) to 1.00 at v127.
     exc_curve_db = {
-        # band 0..2 (bass/low-mid: strong snarl at v88, full bark at v127)
-        0: [-27.0, -24.5, -20.0, -15.8, -11.8, -8.2, -5.0, -2.5, -0.7, 0.0],
-        1: [-27.0, -24.5, -20.0, -15.8, -11.8, -8.2, -5.0, -2.5, -0.7, 0.0],
-        2: [-27.0, -24.5, -20.0, -15.8, -11.8, -8.2, -5.0, -2.5, -0.7, 0.0],
-        # band 3 (midrange C4..B4)
-        3: [-27.0, -24.5, -20.2, -16.2, -12.4, -8.8, -5.4, -2.7, -0.8, 0.0],
-        # band 4..5 (upper mid & clean treble)
-        4: [-27.5, -25.0, -21.0, -17.2, -13.5, -9.8, -6.2, -3.2, -0.9, 0.0],
-        5: [-28.0, -25.5, -21.6, -18.0, -14.4, -10.8, -7.2, -3.8, -1.1, 0.0],
+        0: [-32.0, -29.0, -24.5, -20.0, -15.8, -11.6, -7.4, -3.8, -1.0, 0.0],
+        1: [-32.0, -29.0, -24.5, -20.0, -15.8, -11.6, -7.4, -3.8, -1.0, 0.0],
+        2: [-32.0, -29.0, -24.5, -20.0, -15.8, -11.6, -7.4, -3.8, -1.0, 0.0],
+        3: [-32.0, -29.0, -24.8, -20.4, -16.2, -12.0, -7.8, -4.0, -1.1, 0.0],
+        4: [-32.5, -29.5, -25.2, -21.0, -16.8, -12.6, -8.4, -4.4, -1.2, 0.0],
+        5: [-33.0, -30.0, -25.6, -21.5, -17.4, -13.2, -9.0, -4.8, -1.3, 0.0],
     }
     # Target monotonic RMS loudness curve re v127 (dB) per band:
     # ~25 dB v8..v127 in bass (gentle saturation compression above v88) -> ~27.5 dB in treble
