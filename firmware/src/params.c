@@ -218,7 +218,8 @@ typedef struct {
     uint8_t sus_leds;                          /* 0.9.10: SUSTAIN LEDS, a key the sustain rings on under LEDS ALL /
                                                 * SCALE: 0 DARK (every record before), 1 LIT (frodhes.c key LEDs) */
     uint8_t vc_x[6], vc_y[6];                  /* 1958: 6-point velocity curve (all-zero = default LINEAR) */
-    uint8_t reserved[4];
+    int8_t bk_vel_off;                         /* 1965: black-key velocity offset (-64..+64, default 0) */
+    uint8_t reserved[3];
 #else
     uint8_t play_off;                          /* 0.9.9: DISPLAY PLAY LED: 0 BEAT (every record before), 1 OFF */
     uint8_t vel_resp;                          /* 0.9.10: MIDI RESPONSE, the velocity response (N_VRESP; rhodes.c
@@ -226,7 +227,8 @@ typedef struct {
     uint8_t sus_leds;                          /* 0.9.10: SUSTAIN LEDS, a key the sustain rings on under LEDS ALL /
                                                 * SCALE: 0 DARK (every record before), 1 LIT (frodhes.c key LEDs) */
     uint8_t vc_x[6], vc_y[6];                  /* 1958: 6-point velocity curve (all-zero = default LINEAR) */
-    uint8_t reserved[6];
+    int8_t bk_vel_off;                         /* 1965: black-key velocity offset (-64..+64, default 0) */
+    uint8_t reserved[5];
 #endif
 } settings_t;
 _Static_assert(sizeof(settings_t) == 256, "settings record is 256 B");
@@ -240,9 +242,9 @@ static settings_t set;
 #define VC_FADE_MS 600u
 static const uint8_t VC_PRESETS[VC_NPRESET][2][VC_NPTS] = {
     {{0, 25, 51, 76, 102, 127}, {0, 25, 51, 76, 102, 127}},   /* 0: LIN  (exact 1:1 flat diagonal) */
-    {{0, 30, 60, 88, 108, 122}, {0, 14, 32, 56,  92, 127}},   /* 1: BARK (concave warm->bark) */
-    {{0, 28, 56, 84, 108, 127}, {0, 16, 36, 62,  94, 127}},   /* 2: HVY  (heavy / firm touch) */
-    {{0, 20, 44, 72,  98, 118}, {0, 34, 64, 92, 114, 127}},   /* 3: LGT  (convex light touch) */
+    {{0, 20, 42, 68,  92, 112}, {0, 28, 58, 90, 114, 127}},   /* 1: BARK (convex, pushes mid/upper strikes into bark) */
+    {{0, 20, 44, 72,  98, 118}, {0, 34, 64, 92, 114, 127}},   /* 2: HVY  (convex, bows UP for heavy-action controllers) */
+    {{0, 28, 56, 84, 108, 127}, {0, 16, 36, 62,  94, 127}},   /* 3: LGT  (concave, bows DOWN for light-action controllers) */
     {{0, 25, 51, 76, 102, 127}, {0, 22, 42, 62,  80,  96}},   /* 4: SOFT (mellow dynamic cap) */
 };
 static const char *const N_VC_PRESET[VC_NPRESET + 1u] = {"LIN", "BARK", "HVY", "LGT", "SOFT", "CUST"};
@@ -292,6 +294,14 @@ FR_COLD static uint32_t vcurve_map(uint32_t vel)
     if (vel == 0u) return 0u;
     out = vcurve_eval_raw(vel);
     return out < 1u ? 1u : out > 127u ? 127u : out;
+}
+static inline uint32_t note_is_black(uint32_t n) { return (0x054Au >> (n % 12u)) & 1u; }
+FR_COLD static uint32_t vcurve_apply_offset(uint32_t note, uint32_t vel)
+{
+    int32_t v;
+    if (!vel) return 0u;
+    v = (int32_t)vel + (note_is_black(note) ? (int32_t)set.bk_vel_off : 0);
+    return (uint32_t)(v < 1 ? 1 : v > 127 ? 127 : v);
 }
 FR_COLD static void vcurve_note_on(uint32_t note, uint32_t vel_in)
 {
@@ -553,6 +563,7 @@ FR_COLD static void params_sanitize(void)
             if (set.vc_y[i] > 127u) set.vc_y[i] = 127u;
         }
     }
+    if (set.bk_vel_off < -64 || set.bk_vel_off > 64) set.bk_vel_off = 0;
     if (set.tune < -50 || set.tune > 50) set.tune = 0;
     if (set.focus > 2) set.focus = 0;
     if (set.sc_mode > 2) set.sc_mode = 0;

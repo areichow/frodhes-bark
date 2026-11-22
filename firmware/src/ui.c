@@ -30,7 +30,7 @@ static void tempo_set10(uint32_t b);
  * engines' pages came from their tables (eng_pages.h): VOICE 1/n .. n/n, one PG_VOICE page with its number ui_vp */
 enum { PG_PERF, PG_ASSIGN, PG_PIANO, PG_VOICE, PG_RETIRED4, PG_COMP, PG_FILTER, PG_TREM, PG_PHA, PG_CHO, PG_DELAY,
        PG_TEMPO, PG_SCALE, PG_CHORD, PG_SEQ, PG_ARP, PG_LFO, PG_SETUP, PG_MIDI, PG_DRIVE, PG_REVERB, PG_DISPLAY,
-       PG_REVERB2, PG_EQ, PG_SEQ2, PG_DISPLAY2, PG_VCURVE, PG_N };             /* REVERB 2 (0.9.5): PRE-DELAY, SIZE, MOD, LOW CUT; EQ: before
+       PG_REVERB2, PG_EQ, PG_SEQ2, PG_DISPLAY2, PG_VCURVE, PG_KEYOFF, PG_N };             /* REVERB 2 (0.9.5): PRE-DELAY, SIZE, MOD, LOW CUT; EQ: before
                                                          * the drive (fx_eq.c); VCURVE (1958): 6-point velocity curve */
 enum { E_HEADER = 0, E_TITLE = 1, E_CARD0 = 2, E_FOOTER = 6, E_METER = 7, E_ROLL = 8, E_N = 9, E_CARDS = 10 };   /* E_CARDS: all four;
                                     * E_METER: COMP's meter / SEQUENCER's cells, E_ROLL: SEQUENCER's NOW / NEXT */
@@ -39,7 +39,7 @@ enum { E_HEADER = 0, E_TITLE = 1, E_CARD0 = 2, E_FOOTER = 6, E_METER = 7, E_ROLL
 enum { S_KVEL = 80, S_TUNE, S_BPM, S_CLOCK, S_SCMODE, S_SCALE, S_ROOT, S_TRANS, S_TWKIND, S_PERF0, S_ASG0 = S_PERF0 + 4,
        S_ARPMODE = S_ASG0 + 4, S_ARPRATE, S_ARPOCT, S_ARPGATE, S_USBVOL, S_CHTYPE, S_CHINV, S_CHVOICE, S_CHSTRUM,
        S_SQBARS, S_SQQUANT, S_SQSWING, S_SQEDIT, S_MCH, S_TRS, S_COLOR, S_BRIGHT, S_LEDS, S_TOUCH, S_PLED,
-       S_SQSTEP, S_SQCHANCE, S_VRESP, S_SUSLED, S_VERSION, S_VCPT, S_VCIN, S_VCOUT, S_VCCRV, S_NONE = 0xFF };
+       S_SQSTEP, S_SQCHANCE, S_VRESP, S_SUSLED, S_VERSION, S_VCPT, S_VCIN, S_VCOUT, S_VCCRV, S_BKVEL, S_NONE = 0xFF };
 #ifndef FM1_NENC                                       /* the HAL's encoders and buttons (the FM-1: 7, 14; the SMK-37:
                                                          * 8, 18); the host and the emulator stand in for the FM-1 */
 #define FM1_NENC 7u
@@ -125,8 +125,8 @@ static int32_t sq_step_chance(void);
 static void sq_step_chance_set(int32_t d);
 /* the SELECT order (0.9.3, user: the instrument pages next to each other right after PERFORM; ASSIGN, rarely used,
  * next to SETUP); VOICE stands for all the engine's VOICE pages */
-#define PG_NORD 26u
-static const uint8_t PG_ORDER[PG_NORD] = {PG_PERF, PG_PIANO, PG_VOICE, PG_VCURVE, PG_COMP, PG_EQ, PG_DRIVE, PG_FILTER, PG_TREM, PG_PHA,
+#define PG_NORD 27u
+static const uint8_t PG_ORDER[PG_NORD] = {PG_PERF, PG_PIANO, PG_VOICE, PG_VCURVE, PG_KEYOFF, PG_COMP, PG_EQ, PG_DRIVE, PG_FILTER, PG_TREM, PG_PHA,
                                           PG_CHO, PG_DELAY, PG_REVERB, PG_REVERB2, PG_TEMPO, PG_SCALE, PG_CHORD, PG_ARP,
                                           PG_LFO, PG_SEQ, PG_SEQ2, PG_ASSIGN, PG_SETUP, PG_MIDI, PG_DISPLAY, PG_DISPLAY2};   /* (DISPLAY 2 last: the SMK-37 stops before it, PG_WALK) DRIVE before FILTER
                                     * (0.9.5, the user), REVERB the last effect, as in the chain, its second page right
@@ -165,7 +165,7 @@ FR_COLD static uint32_t pg_at(uint32_t k, uint32_t *vp)         /* the k-th page
 static const char *const PAGE_TITLE[PG_N] = {"PERFORM", "ASSIGN", "FRODHES-BARK", "VOICE", "", "COMPRESSOR", "FILTER", "TREM/WAH",
                                              "PHASER", "CHORUS", "DELAY", "TEMPO", "SCALE", "CHORD", "SEQUENCER",
                                              "ARPEGGIO", "LFO", "SETUP", "MIDI", "DRIVE", "REVERB", "DISPLAY",
-                                             "REVERB 2", "EQ", "SEQUENCER 2", "DISPLAY 2", "VELOCITY"};
+                                             "REVERB 2", "EQ", "SEQUENCER 2", "DISPLAY 2", "VELOCITY", "KEY OFFSET"};
 static const uint8_t PAGE_S[PG_N][4] = {                /* VOICE and FRODHES K2 / K3: the engine's (slot_at) */
     {S_PERF0, S_PERF0 + 1, S_PERF0 + 2, S_PERF0 + 3},
     {S_ASG0, S_ASG0 + 1, S_ASG0 + 2, S_ASG0 + 3},
@@ -194,6 +194,7 @@ static const uint8_t PAGE_S[PG_N][4] = {                /* VOICE and FRODHES K2 
     {S_SQSTEP, S_SQCHANCE, S_NONE, S_NONE},             /* SEQUENCER 2: a step's CHANCE (0.9.9) */
     {UI_SUSLED, S_NONE, S_NONE, S_NONE},                /* DISPLAY 2: SUSTAIN LEDS (issue #35) */
     {S_VCPT, S_VCIN, S_VCOUT, S_VCCRV},                 /* VELOCITY: 6-point velocity curve (1958) */
+    {S_BKVEL, S_NONE, S_NONE, S_NONE},                  /* KEY OFFSET: black-key velocity offset (1965) */
 };
 static const char *const PAGE_LAB[PG_N][4] = {
     {"", "", "", ""},                                   /* PERFORM: the assigned parameter's name (slot_label) */
@@ -223,6 +224,7 @@ static const char *const PAGE_LAB[PG_N][4] = {
     {"STEP", "CHANCE", "", ""},
     {UI_SUSLED_LAB, "", "", ""},
     {"POINT", "IN", "OUT", "CURVE"},
+    {"BLACK KEYS", "", "", ""},
 };
 static const char *const PAGE_HINT[PG_N] = {"THE KNOBS: SET ON ASSIGN", "WHAT EACH PERFORM KNOB PLAYS",
                                             "FX: ALL EFFECTS ON / OFF", "", "",
@@ -233,7 +235,8 @@ static const char *const PAGE_HINT[PG_N] = {"THE KNOBS: SET ON ASSIGN", "WHAT EA
                                             "THE SCREEN AND THE KEY LIGHTS", "SIZE AUTO: MIX SETS THE SIZE",
                                             "BEFORE THE DRIVE  0 DB: FLAT", "HOW OFTEN THE STEP'S NOTES PLAY",
                                             "KEY LIGHTS UNDER THE SUSTAIN",
-                                            "K1: PT  K2: IN  K3: OUT  K4: CURVE/LIN"};
+                                            "K1: PT  K2: IN  K3: OUT  K4: CURVE/LIN",
+                                            "VELOCITY OFFSET FOR BLACK KEYS"};
 /* the reverb's TYPE card (P_RV_TYPE, as the drive's: 0 OFF, then the types; params.c N_RV / N_RV_LONG) */
 #define RV_INF 3u                                       /* INFINITE: DECAY 120..126 SUSTAIN (the tail holds, the input
                                                          * open), 127 FREEZE (the input closed): rev_ctl_t.freeze */
@@ -670,6 +673,7 @@ FR_COLD static int32_t slot_val(uint32_t s, int32_t *hi)
     case S_VCIN: *hi = 127; return set.vc_x[vc_sel];
     case S_VCOUT: *hi = 127; return set.vc_y[vc_sel];
     case S_VCCRV: *hi = (int32_t)VC_NPRESET; return (int32_t)vcurve_preset_idx();
+    case S_BKVEL: *hi = 128; return (int32_t)set.bk_vel_off + 64;
     case S_CHTYPE: *hi = CH_NTYPE - 1; return CH_TYPE;
     case S_CHINV: *hi = 3; return CH_INV;
     case S_CHVOICE: *hi = 2; return CH_VOICE;
@@ -687,7 +691,7 @@ FR_COLD static int slot_is_level(uint32_t s)                    /* a gauge only 
 {
     if (s < P_COUNT) return PARAMS[s].fmt != F_ENUM && PARAMS[s].fmt != F_DIV;
     return s == S_KVEL || s == S_TUNE || s == S_BPM || s == S_TRANS || s == S_ARPGATE || s == S_CHSTRUM
-        || s == S_SQSTEP || s == S_VCIN || s == S_VCOUT; /* (STEP: the cursor's place in the loop, up to 256 steps) */
+        || s == S_SQSTEP || s == S_VCIN || s == S_VCOUT || s == S_BKVEL; /* (STEP: the cursor's place in the loop, up to 256 steps) */
 }
 FR_COLD static void fmt_signed(char *s, int32_t v) { if (v > 0) { s[0] = '+'; p_fmt_int(s + 1, v); } else p_fmt_int(s, v); }
 /* a rate / time knob that is synced to the tempo: its SYNC parameter (the knob shows and steps the note value), else 0 */
@@ -772,6 +776,7 @@ FR_COLD static void slot_text(uint32_t s, char *v)
         return;
     }
     case S_VCCRV: p_strcpy(v, N_VC_PRESET[vcurve_preset_idx()], 6); return;
+    case S_BKVEL: fmt_signed(v, set.bk_vel_off); return;
     case S_CHTYPE: p_strcpy(v, CH_TYPE_NAME[CH_TYPE], 9); return;
     case S_CHINV: p_strcpy(v, CH_INV_NAME[CH_INV], 4); return;
     case S_CHVOICE: p_strcpy(v, CH_VOICE_NAME[CH_VOICE], 5); return;
@@ -915,6 +920,10 @@ FR_COLD static void slot_turn(uint32_t s, int32_t d)
         ui_mark(E_CARDS); ui_mark(E_METER);
         break;
     }
+    case S_BKVEL:
+        set.bk_vel_off = (int8_t)clampi((int32_t)set.bk_vel_off + d, -64, 64);
+        set_dirty = 1; set_t_change = fm1_ms;
+        break;
     case S_TOUCH:                                       /* how the keys' velocity follows the press (keyvel.c) */
         kv_touch_store((uint32_t)clampi((int32_t)kv_touch() + sgn(d), 0, KV_NTOUCH - 1));
         kv_apply();

@@ -1529,14 +1529,15 @@ static void rh_init(rh_voice_t *v, uint32_t note, uint32_t vel)
 #endif
         if (g < 4096u) g = 4096u;
         ig = 0x80000000u / g;                             /* 1 / g, Q15 (g Q16) */
-        v->m[RH_V1].kap = (int32_t)(((uint64_t)RH_KAP[ki] * ig * ig) >> 30);
-        v->m[RH_V1].kap <<= 2u * RH_FAM_SH[k->fam];      /* S8: the 1/16" family's x is in its own (double) gap, so
-                                                           * the same swing is half the x: kap x 4 keeps the offset */
 #ifdef RH_DRIVE
         if (!RH_IS_MAP(v))
-            v->m[RH_V1].kap = (int32_t)(((uint64_t)(uint32_t)v->m[RH_V1].kap * RH_KAP_X[ki]) >> 16);   /* the
-                                                           * drive's swing at v127 is m127 x the physical one */
+            v->m[RH_V1].kap = (int32_t)(((uint64_t)RH_KAP_DRV[ki] * ig * ig) >> 30);
+        else
 #endif
+        {
+            v->m[RH_V1].kap = (int32_t)(((uint64_t)RH_KAP[ki] * ig * ig) >> 30);
+            v->m[RH_V1].kap <<= 2u * RH_FAM_SH[k->fam];  /* S8: 1/16" family's x is in its own (double) gap */
+        }
     }
 #endif
     if (wu) { v->hd_n = 0; v->hd_w = 0; v->hd_g0 = v->gain; }

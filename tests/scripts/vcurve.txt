@@ -23,24 +23,34 @@
 150 expect state card0 P1
 150 expect state card1 0
 150 expect state card3 LIN
-# Switch K4 (enc 5) to BARK preset
+# Switch K4 (enc 5) to BARK preset (convex: y > x)
 200 turn 5 1
 250 expect state card3 BARK
 250 expect state vcid 0
-250 expect state vcmap.30 14
-250 expect state vcmap.60 32
-250 expect state vcmap.88 56
-250 expect state vcmap.108 92
-250 expect state vcmap.122 127
-# Manual K1/K2/K3 edit: select P2 (x=30, y=14), push IN past P3.x (60) -> clamps to 60, raise OUT +20 -> 34
+250 expect state vcmap.20 28
+250 expect state vcmap.42 58
+250 expect state vcmap.68 90
+250 expect state vcmap.92 114
+250 expect state vcmap.112 127
+# Check HVY (convex, y > x) and LGT (concave, y < x), then return to BARK
+260 turn 5 1
+265 expect state card3 HVY
+265 expect state vcmap.44 64
+270 turn 5 1
+275 expect state card3 LGT
+275 expect state vcmap.56 36
+280 turn 5 -1
+282 turn 5 -1
+285 expect state card3 BARK
+# Manual K1/K2/K3 edit: select P2 (x=20, y=28), push IN past P3.x (42) -> clamps to 42, raise OUT +20 -> 48
 300 turn 2 1
 350 expect state card0 P2
-350 expect state card1 30
+350 expect state card1 20
 400 turn 3 50
-450 expect state card1 60
+450 expect state card1 42
 450 expect state card3 CUST
 500 turn 4 20
-550 expect state card2 P_34
+550 expect state card2 MP_48
 550 expect state card3 CUST
 550 expect state dirty 1
 # Wait > 2 s while silent for auto-save to flush settings_t (vc_x/vc_y persisted)

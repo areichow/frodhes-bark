@@ -921,8 +921,27 @@ def emit(spec, fam_tabs):
         w("#ifdef FR_HQ   /* the Move's HQ live contact: the force gains' scale over the physical ones (hq_pulse) */")
         w("static const float RH_DRV_BSC[RH_NKEY] = {" + ",".join("%.9gf" % k["drive"]["bsc"] for k in spec["keys"]) + "};")
         w("#endif")
-        w("static const uint16_t RH_KAP_X[48 - RH_KEY_LO] = {" + ",".join(
-            str(max(1, min(65535, int(round(65536 / k["drive"]["bsc"] ** 2))))) for k in spec["keys"] if k["midi"] < 48) + "};")
+        def _kap_drv(k):
+            m0 = k["modes"][0]
+            E = 2.0 * math.sin(math.pi * m0["f"] / FS)
+            eps = math.exp(-6.907755278982137 / (m0["t60"] * FS))
+            b = m0["b"] * (k["pulse"]["pdrv"][-1] / 32768.0)
+            sh = k["pulse"]["shapes"][-1]
+            step = k["pulse"]["prate"][-1] / 4096.0
+            x = y = pos = peak = 0.0
+            while pos < len(sh) - 1:
+                i = int(pos)
+                p = sh[i] + (sh[i + 1] - sh[i]) * (pos - i)
+                x = eps * (x + E * y)
+                y = eps * (y - E * x) + b * p
+                a = math.hypot(x, y)
+                if a > peak:
+                    peak = a
+                pos += step
+            df = 2.0 ** (6.0 * min(1.0, (48 - k["midi"]) / 12.0) / 1200.0) - 1.0
+            return max(1, min(65535, int(round(df * 65536.0 / max(1e-6, peak) ** 2))))
+        w("static const uint16_t RH_KAP_DRV[48 - RH_KEY_LO] = {" + ",".join(
+            str(_kap_drv(k)) for k in spec["keys"] if k["midi"] < 48) + "};")
     w("static const uint8_t RH_VPOS_I[128] = {" + ",".join(map(str, spec["vpos_idx"])) + "};")
     w("static const uint8_t RH_VPOS_F[128] = {" + ",".join(str(min(255, f)) for f in spec["vpos_frac"]) + "};")
     li, lw = vlayers()

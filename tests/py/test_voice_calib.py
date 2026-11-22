@@ -68,7 +68,7 @@ def test_bark_grows_with_velocity(vel):
     h = vel["H21"]
     med = lambda v: float(np.median(h[:, jv(v)]))
     assert med(64) < -18 and med(104) < med(127) < 8.0, (med(64), med(104), med(127))
-    assert 8.0 < h[:, jv(127)].max() < 18.0, h[:, jv(127)].max()     # Stage 73 bark ceiling (+8..+15 dB)
+    assert 3.5 < h[:, jv(127)].max() < 18.0, h[:, jv(127)].max()     # Build 1965 tamed neutral bark ceiling
     top = [KEYS.index(n) for n in range(86, 104)]
     assert np.abs(h[top, jv(127)] - h[top, jv(40)]).max() < 2.5      # top keys held clean
     bass = [KEYS.index(n) for n in range(28, 53)]

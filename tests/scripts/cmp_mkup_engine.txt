@@ -12,6 +12,7 @@
 109 turn 0 1
 111 turn 0 1
 113 turn 0 1
+115 turn 0 1
 300 turn 2 10
 500 expect state page COMPRESSOR
 500 expect state card.5.3 +1.9
@@ -29,6 +30,7 @@
 1012 turn 0 1
 1014 turn 0 1
 1016 turn 0 1
+1018 turn 0 1
 1200 turn 2 10
 1400 expect state page COMPRESSOR
 1400 expect state card.5.3 +5.3

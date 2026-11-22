@@ -30,15 +30,15 @@
 300 btn 7
 400 btn 7
 450 expect state page DISPLAY
-450 expect state count 27/27
-450 expect state pages 27
+450 expect state count 28/28
+450 expect state pages 28
 500 turn 0 1
 600 expect state page DISPLAY
-600 expect state count 27/27
+600 expect state count 28/28
 700 turn 0 3
 800 expect state page DISPLAY
-# back one: MIDI, 26/27
+# back one: MIDI, 27/28
 900 turn 0 -1
 1000 expect state page MIDI
-1000 expect state count 26/27
+1000 expect state count 27/28
 1100 end

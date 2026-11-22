@@ -50,6 +50,7 @@ static void eng_send(uint32_t type, uint32_t n, uint32_t v)
         if (n < 128u && v) {
             ped.down[n >> 5] |= 1u << (n & 31u);
             if (ped.on) ped.sus[n >> 5] |= 1u << (n & 31u);
+            v = vcurve_apply_offset(n, v);
             vcurve_note_on(n, v);
             v = vcurve_map(v);
         }

@@ -1932,6 +1932,8 @@ FR_COLD static int host_state(const char *key, char *v, unsigned n)
         snprintf(v, n, "%u", (unsigned)ok);
     }
     else if (sscanf(key, "vcmap.%u", &a) == 1 && a <= 127u) snprintf(v, n, "%u", (unsigned)vcurve_map(a));
+    else if (!strcmp(key, "bkoff")) snprintf(v, n, "%d", (int)set.bk_vel_off);
+    else if (sscanf(key, "vcapply.%u.%u", &a, &c) == 2 && a < 128u && c <= 127u) snprintf(v, n, "%u", (unsigned)vcurve_apply_offset(a, c));
     else if (!strcmp(key, "preset")) snprintf(v, n, "%u", set.preset);
     else if (!strcmp(key, "bpm10")) snprintf(v, n, "%u", tempo_bpm10());          /* the tempo shown (tempo.c) */
     else if (!strcmp(key, "setbpm")) snprintf(v, n, "%u", set.bpm10);             /* the tempo setting */

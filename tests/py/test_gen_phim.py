@@ -40,7 +40,7 @@ def test_two_pickup_families():
     out = open(gen_phim.OUT).read()
     assert re.search(r"\*const RH_PHIM\[2\] = \{RH_PHIM_0, RH_PHIM_1\}", out)
     p = json.load(open(os.path.join(ROOT, "docs", "model", "data", "params.json")))
-    assert p["pickup"]["R"] == [0.5, 1.0] and p["pickup"]["family0_keys"] == [[21, 55], [96, 108]]
+    assert p["pickup"]["R"] == [0.5, 1.0] and p["pickup"]["family0_keys"] == [[21, 52], [96, 108]]
     spec = json.load(open(os.path.join(ROOT, "docs", "model", "data", "rhodes_spec.json")))
     for k in spec["keys"]:
-        assert k["fam"] == (0 if k["midi"] <= 55 or k["midi"] >= 96 else 1), k["midi"]
+        assert k["fam"] == (0 if k["midi"] <= 52 or k["midi"] >= 96 else 1), k["midi"]

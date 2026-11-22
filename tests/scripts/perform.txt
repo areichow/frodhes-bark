@@ -70,6 +70,7 @@
 1040 turn 0 1
 1042 turn 0 1
 1044 turn 0 1
+1046 turn 0 1
 1050 expect state page ASSIGN
 1100 turn 2 4
 1150 expect state label.0.0 COMP_THR

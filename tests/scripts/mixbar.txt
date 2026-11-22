@@ -15,6 +15,7 @@
 250 turn 0 1
 260 turn 0 1
 270 turn 0 1
+275 turn 0 1
 300 expect state page DRIVE
 300 expect state label3 MIX
 700 midi 0xB0 83 0
