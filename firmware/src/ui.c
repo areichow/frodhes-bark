@@ -1825,9 +1825,9 @@ FR_COLD static void draw_footer(void)
         ft_c(22, page_hint(ui_page), FC_DIM);
     } else if (ui_page == PG_SETUP) {                   /* what this is: the name, the version, the battery's reading
                                                          * (calibration), the audio's time */
-        char t[36];
+        char t[44];
         uint32_t n;
-        p_strcpy(t, "FRODHES-BARK ", 13); p_strcpy(t + 13, ui_version(), 10);
+        p_strcpy(t, "FRODHES-BARK ", 13); p_strcpy(t + 13, ui_version(), 14);
         n = 0; while (t[n]) n++;
         p_strcpy(t + n, "  BAT ", 6); p_fmt_int(t + n + 6, batt_raw());
         ft_c(7, t, UI_ACC);
@@ -1894,7 +1894,7 @@ static uint32_t ui_splash_t;
 static uint8_t ui_splash_on;
 FR_COLD static void ui_splash(void)
 {
-    static char v[20];
+    static char v[24];
     uint32_t i;
     mt_update();
     lcd_fill(0, 0, 240, 240, C_BLACK);
@@ -1909,7 +1909,7 @@ FR_COLD static void ui_splash(void)
     ft_c(48, "ELECTRIC PIANO + VIBES + MARIMBA", FC_LAB);
     cv_blit(0, 110);
     cv_begin(240, 20, C_BLACK);
-    p_strcpy(v, "VERSION ", 8); p_strcpy(v + 8, ui_version(), 10);
+    p_strcpy(v, "VERSION ", 8); p_strcpy(v + 8, ui_version(), 14);
     ft_c(10, v, FC_DIM);
     cv_blit(0, 210);
     ui_splash_t = fm1_ms;

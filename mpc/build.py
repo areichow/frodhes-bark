@@ -267,15 +267,15 @@ def pad_version(v):
     return ".".join(str(x) for x in (nums + [0, 0, 0, 0])[:4])
 
 
-INSTALL = """Frodhes {ver} for Akai MPC (standalone)
+INSTALL = """Frodhes-Bark {ver} for Akai MPC (standalone)
 =====================================================================
 
-Frodhes is a physical-model electric piano, vibraphone and marimba with its own effects: the sound engine of the
-Frodhes firmware for the M-VAVE FM-1, here as an instrument plugin for MPC standalone hardware. No samples: every
-note is computed. HQ engine and effects, 16 voices on every instrument.
+Frodhes-Bark is a physical-model electric piano (Rhodes + Wurlitzer 140B/200A), vibraphone and marimba with its own
+effects: the sound engine of the Frodhes-Bark firmware for the M-VAVE FM-1, here as an instrument plugin for MPC
+standalone hardware. No samples: every note is computed. HQ engine and effects, 16 voices on every instrument.
 
-Frodhes runs on Akai MPC standalone hardware (checked by a tester on an MPC); it is also tested on a computer, in the
-MPC Plugin SDK's host simulator. Reports are welcome: see "What to report back" below.
+Frodhes-Bark runs on Akai MPC standalone hardware; it is also tested on a computer, in the MPC Plugin SDK's host
+simulator. Reports are welcome: see "What to report back" below.
 
 NEEDS
 - MPC OS 3.10.1 or later (Preferences > Info shows the version).
@@ -290,9 +290,9 @@ INSTALL
        <drive>/VST2 Plugins/{folder}/frodhes-arm32.so  (and frodhes-arm64.so)
        <drive>/VST2 Plugins/{folder}/Plugin Skins/...
    Keep the folder's name exactly as it is: the MPC finds the plugin's pages by it.
-2. Insert the drive. If Frodhes does not appear, restart the MPC (a rescan happens at start).
-3. Make a Plugin program (or a plugin track) and pick Frodhes from the plugin browser under "External Plugins".
-   Play it from the pads or a keyboard. The presets F01-F57 are in the plugin's preset list.
+2. Insert the drive. If Frodhes-Bark does not appear, restart the MPC (a rescan happens at start).
+3. Make a Plugin program (or a plugin track) and pick Frodhes-Bark from the plugin browser under "External Plugins".
+   Play it from the pads or a keyboard. The presets F01-F69 are in the plugin's preset list.
 
 REMOVE IT (also if it misbehaves)
 - Delete the folder "{folder}" from "VST2 Plugins" and restart the MPC. Projects that used it still open, without
@@ -303,24 +303,24 @@ REMOVE IT (also if it misbehaves)
 
 WHAT TO REPORT BACK (thank you!)
 1. Your MPC model (e.g. MPC One, Live II, Live III, Key 61) and MPC OS version (Preferences > Info).
-2. Does Frodhes appear and load? Do its pages show (VOICE, PLAY, COMP EQ, ... REVERB) and do the Q-Link knobs
+2. Does Frodhes-Bark appear and load? Do its pages show (VOICE, PLAY, COMP EQ, ... REVERB) and do the Q-Link knobs
    move them?
-3. The CPU meter (the MPC's CPU display) with one Frodhes playing:
+3. The CPU meter (the MPC's CPU display) with one Frodhes-Bark playing:
    a) about 10 voices: hold a 10-note chord, or play quickly with the sustain pedal down
    b) the most it can do: 16 voices (hold the sustain pedal and play 16 or more keys), with REVERB TYPE HALL,
       DELAY on and CHORUS on
-   and, if you can, the same with 2 or 3 Frodhes tracks at once.
+   and, if you can, the same with 2 or 3 Frodhes-Bark tracks at once.
 4. Any clicks, crackles, dropouts, hanging notes or freezes, and what you were doing when they happened (the
    preset, the number of keys, the audio buffer size in Preferences > Audio if you know it).
 5. Does a saved project bring the sound back exactly (save, reload)?
 
-Frodhes is free software under the GNU General Public License version 3 (LICENSE.txt). The source code:
-https://github.com/leonardoMirabal/frodhes (SOURCE.txt).
+Frodhes-Bark is free software under the GNU General Public License version 3 (LICENSE.txt). The source code:
+https://github.com/areichow/frodhes-bark (SOURCE.txt).
 """
 
-SOURCE = """Frodhes {ver} for Akai MPC.
+SOURCE = """Frodhes-Bark {ver} for Akai MPC.
 The complete source code of this plugin (the engine, the MPC wrapper in mpc/ and the build script mpc/build.py) is
-at https://github.com/leonardoMirabal/frodhes . Build it with  make mpc  (docs/MPC.md).
+at https://github.com/areichow/frodhes-bark . Build it with  make mpc  (docs/MPC.md).
 """
 
 
@@ -396,7 +396,8 @@ def main():
     log(v.stdout.rstrip())
     if v.returncode:
         die("validate.py failed:\n" + v.stderr)
-    zpath = os.path.join(out, "frodhes-mpc.zip")
+    zname = "frodhes-bark-%s-mpc.zip" % args.version if args.version and args.version != "0.0.0-dev" else "frodhes-mpc.zip"
+    zpath = os.path.join(out, zname)
     def put(zf, name, data):   # (a fixed date and mode: the same inputs give the same zip, byte for byte)
         zi = zipfile.ZipInfo(name, date_time=(2026, 1, 1, 0, 0, 0))
         zi.compress_type, zi.external_attr = zipfile.ZIP_DEFLATED, 0o644 << 16
@@ -418,6 +419,8 @@ def main():
         log("%-6s %s  %.1f MB  sha256 %s" % (a, os.path.relpath(f, ROOT), os.path.getsize(f) / 1e6,
                                              hashlib.sha256(open(f, "rb").read()).hexdigest()))
     log("zip    %s  sha256 %s" % (os.path.relpath(zpath, ROOT), hashlib.sha256(open(zpath, "rb").read()).hexdigest()))
+    if zname != "frodhes-mpc.zip":
+        shutil.copyfile(zpath, os.path.join(out, "frodhes-mpc.zip"))
     return 0
 
 

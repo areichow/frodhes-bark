@@ -71,8 +71,8 @@ MODEL_PID = {"pro": 0x0007, "elite": 0x0008, "mke": 0x0009}   # the app's USB pr
 DATA_FAMILY = "FRODHES"             # the SMK store's owner tag (store.h): 1..7 of A-Z 0-9
 SCREEN_NAME = "FRODHES-BARK"        # the update loader's screen (FM-1, ldr_screen.c): the name and its colour (RGB565)
 SCREEN_COLOUR = 0xE3C1              # AMBER, the screen's default accent (ui.c COLOR step 0)
-PRODUCT = "FM-1_1966"               # Frodhes-Bark, build 1966 identity
-VERSION = "1966"                    # APP_VER (overridable via --release)
+PRODUCT = "FM-1_1968"               # Frodhes-Bark permanent FM-1 identity (1968 = Wurlitzer 200 year)
+VERSION = (SRC / "VERSION").read_text().strip()   # APP_VER from root VERSION file (overridable via --release)
 
 
 def toolchain():
@@ -616,15 +616,15 @@ def float_check(cpp=None, board=None, root=SRC, extra=()):
 
 
 def package(board="fm1", model="pro", release=None):
-    """(identity, file name) of a build. The FM-1's identity is PRODUCT for every version and dev build (the version
-    is only text); a board's model name (SMK-37) changes its identity and the file name"""
+    """(identity, file name) of a build. FM-1 identity is permanent PRODUCT (FM-1_1968);
+    SMK-37 models report <MODEL>_1968. Release builds use frodhes-bark-<release>...fwsc."""
     suffix = "" if board == "fm1" else "-" + board
     ident = PRODUCT
     if board != "fm1":
-        ident = BOARD_PREFIX[board].replace(MODELS["pro"], MODELS[model]) + "0"
+        ident = f"{MODELS[model]}_1968"
         if model != "pro":
             suffix += "-" + model
-    return ident, f"frodhes-{release}{suffix}.fwsc" if release else f"frodhes{suffix}.fwsc"
+    return ident, f"frodhes-bark-{release}{suffix}.fwsc" if release else f"frodhes{suffix}.fwsc"
 
 
 def main():
@@ -673,8 +673,8 @@ def main():
         BOARD_DEFS[BOARD] = [*BOARD_DEFS[BOARD], f'-DSMK_MODEL="{MODELS[model]}"']
         BOARD_APP_DEFS[BOARD] = [*BOARD_APP_DEFS[BOARD], f"-DFELUCCA_USB_PID=0x{MODEL_PID[model]:04X}"]   # (the app's)
     if a.release:
-        if not re.fullmatch(r"\d{1,2}\.\d{1,2}(\.\d{1,3})?(-[A-Za-z0-9]+)?", a.release):
-            raise SystemExit(f"--release {a.release}: use X.Y, X.Y.Z or X.Y.Z-suffix")
+        if not re.fullmatch(r"(\d{8}\.\d{1,3}|\d{1,2}\.\d{1,2}(\.\d{1,3})?)(-[A-Za-z0-9]+)?", a.release):
+            raise SystemExit(f"--release {a.release}: use YYYYMMDD.N or X.Y[.Z][-suffix]")
         VERSION = a.release
     PRODUCT, name = package(BOARD, model, a.release)
     if a.c1:

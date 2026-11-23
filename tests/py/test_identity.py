@@ -1,8 +1,5 @@
 # SPDX-License-Identifier: GPL-3.0-only
-"""The package identity stays FM-1_958 for every FM-1 build (dev and release), through every Dinghy merge.
-
-The hub and the installers tell Frodhes from the other firmwares by it (950 and 953 are others'); Dinghy 0.4's
-build.py derives FM-1_99N from the release instead, which must never reach an FM-1 build of Frodhes."""
+"""Permanent firmware identity (1968) and date-based rolling release version (VERSION) checks."""
 import importlib.util
 import re
 import sys
@@ -21,32 +18,30 @@ def build_py():
 
 def test_fm1_identity_every_build():
     b = build_py()
-    assert b.PRODUCT == "FM-1_1966"
-    assert b.package() == ("FM-1_1966", "frodhes.fwsc")
-    for v in ("0.9.5", "0.9.10", "1.0", "0.9.5-rc1"):
-        assert b.package("fm1", "pro", v) == ("FM-1_1966", f"frodhes-{v}.fwsc")
+    assert b.PRODUCT == "FM-1_1968"
+    assert b.VERSION == (ROOT / "VERSION").read_text().strip()
+    assert b.package() == ("FM-1_1968", "frodhes.fwsc")
+    for v in ("20261122.0", "20261122.1", "1.0.0", "1.0-rc1"):
+        assert b.package("fm1", "pro", v) == ("FM-1_1968", f"frodhes-bark-{v}.fwsc")
 
 
 def test_smk_builds_never_take_the_fm1_identity():
     b = build_py()
-    for model in b.MODELS:
+    want = {"pro": "SMK-37 Pro_1968", "elite": "SMK-37 Elite_1968", "mke": "MKE-P37_1968"}
+    for model, ident_want in want.items():
         ident, name = b.package("smk37", model)
-        assert ident != "FM-1_1966" and not ident.startswith("FM-1")
+        assert ident == ident_want
+        assert not ident.startswith("FM-1")
         assert name.startswith("frodhes-smk37")
 
 
-def test_release_smk_assets_are_the_release_builds():
-    """tools/release.py SMK_ASSETS (release.yml's SMK-37 assets, fixed names) are build.py's release packages of the
-    three models, each under its own identity (SMK-37 Pro_470, SMK-37 Elite_470, MKE-P37_470), never the FM-1's"""
+def test_release_filenames_and_identities():
     b = build_py()
-    import release
-    want = {"pro": ("SMK-37 Pro_470", "frodhes-smk37-pro.fwsc"),
-            "elite": ("SMK-37 Elite_470", "frodhes-smk37-elite.fwsc"),
-            "mke": ("MKE-P37_470", "frodhes-mke-p37.fwsc")}
-    assert list(release.SMK_ASSETS) == [want[m][1] for m in ("pro", "elite", "mke")]
-    for model, (ident, pub) in want.items():
-        assert b.package("smk37", model, "0.9.9") == (ident, release.SMK_ASSETS[pub].format(v="0.9.9"))
-    assert b.package("fm1", "pro", "0.9.9") == ("FM-1_1966", "frodhes-0.9.9.fwsc")    # the FM-1's unchanged
+    v = "20261122.0"
+    assert b.package("fm1", "pro", v) == ("FM-1_1968", f"frodhes-bark-{v}.fwsc")
+    assert b.package("smk37", "pro", v) == ("SMK-37 Pro_1968", f"frodhes-bark-{v}-smk37.fwsc")
+    assert b.package("smk37", "elite", v) == ("SMK-37 Elite_1968", f"frodhes-bark-{v}-smk37-elite.fwsc")
+    assert b.package("smk37", "mke", v) == ("MKE-P37_1968", f"frodhes-bark-{v}-smk37-mke.fwsc")
 
 
 def test_main_sets_the_identity_only_through_package():
@@ -57,17 +52,23 @@ def test_main_sets_the_identity_only_through_package():
 
 
 def test_built_package_carries_it():
-    """the last firmware build, when there is one (./build.sh): the package's identity as the installer reads it, and
-    the app's own answer to the hub's handshake (FELUCCA_ID in the app image), no Dinghy FM-1_99N anywhere"""
-    pkg, app = ROOT / "build" / "frodhes.fwsc", ROOT / "build" / "frodhes.bin"
-    if not pkg.exists():
-        pkg = ROOT / "build" / "frodhes-c1.fwsc"
-    if not pkg.exists() or not app.exists():
+    """Built FM-1 package carries permanent FM-1_1968 in package header and app binary, plus APP_VER."""
+    ver = (ROOT / "VERSION").read_text().strip()
+    candidates = [
+        ROOT / "build" / f"frodhes-bark-{ver}-c1.fwsc",
+        ROOT / "build" / f"frodhes-bark-{ver}.fwsc",
+        ROOT / "build" / "frodhes-c1.fwsc",
+        ROOT / "build" / "frodhes.fwsc",
+    ]
+    pkg = next((p for p in candidates if p.exists()), None)
+    app = ROOT / "build" / "frodhes.bin"
+    if pkg is None or not app.exists():
         import pytest
-        pytest.skip("no build/frodhes[-c1].fwsc (./build.sh)")
+        pytest.skip("no built FM-1 .fwsc / frodhes.bin")
     sys.path.insert(0, str(ROOT / "tools"))
     import fm1_install
-    assert fm1_install.product_of(pkg.read_bytes()) == "FM-1_1966"
+    assert fm1_install.product_of(pkg.read_bytes()) == "FM-1_1968"
     img = app.read_bytes()
-    assert b"FM-1_1966\0" in img
+    assert b"FM-1_1968\0" in img
+    assert ver.encode() + b"\0" in img
     assert not re.search(rb"FM-1_99\d", img)

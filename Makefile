@@ -325,9 +325,26 @@ plugin-hosts: plugin       ## macOS: the VST3 / AU in Apple's AU host and a JUCE
 # ---- the Akai MPC port (docs/MPC.md): the desktop plugin's engine as an MPC plugin (VST 2.4, arm32 + arm64), built
 # with the MPC Plugin SDK's toolchain (zig; the SDK fetched into .local/mpc-sdk on first use). Nothing is installed.
 MPC_J ?= 2
-.PHONY: mpc mpc-catalog test-mpc
-mpc:                       ## build/mpc: the plugin folder (both ARM builds, validated), frodhes-mpc.zip, the native test build
-	nice -n 15 $(PY) mpc/build.py --target all --tools -j$(MPC_J)
+MPC_VER ?= $(shell cat VERSION)
+.PHONY: mpc mpc-catalog test-mpc dist
+mpc:                       ## build/mpc: the plugin folder (both ARM builds, validated), frodhes-bark-<VER>-mpc.zip, native test build
+	nice -n 15 $(PY) mpc/build.py --target all --tools --version $(MPC_VER) -j$(MPC_J)
+
+dist:                      ## build all 5 release artifacts for VERSION + build/SHA256SUMS.txt
+	@VER=$$(cat VERSION); \
+	./build.sh --board smk37 --release "$$VER" && \
+	./build.sh --board smk37 --model elite --release "$$VER" && \
+	./build.sh --board smk37 --model mke --release "$$VER" && \
+	./build.sh --c1 --release "$$VER" && \
+	$(MAKE) mpc MPC_VER="$$VER" && \
+	cp "build/mpc/frodhes-bark-$$VER-mpc.zip" "build/frodhes-bark-$$VER-mpc.zip" && \
+	(cd build && sha256sum \
+	  "frodhes-bark-$$VER-c1.fwsc" \
+	  "frodhes-bark-$$VER-smk37.fwsc" \
+	  "frodhes-bark-$$VER-smk37-elite.fwsc" \
+	  "frodhes-bark-$$VER-smk37-mke.fwsc" \
+	  "frodhes-bark-$$VER-mpc.zip" > SHA256SUMS.txt) && \
+	cat build/SHA256SUMS.txt
 
 mpc-catalog: mpc           ## build/mpc/Frodhes-<MPC_VER>-mpc-{armv7,aarch64}.zip: the open-mpc catalogue's per-build zips from the
                            ## plugin folder (tools/mpc_catalog_zip.py; its installer templates fetched once, pinned by sha256)

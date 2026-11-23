@@ -45,12 +45,15 @@ extern "C" {
 
 namespace {
 
-/* the VST version number from FRP_VERSION's X.Y.Z (X * 10000 + Y * 100 + Z; 0 for a dev build) */
+/* the VST version number from FRP_VERSION: X.Y.Z -> X*10000+Y*100+Z, or YYYYMMDD.N -> (YYYYMMDD-20000000)*10+N */
 int versionNumber()
 {
     int x = 0, y = 0, z = 0;
-    if (std::sscanf(FRP_VERSION, "%d.%d.%d", &x, &y, &z) != 3) return 0;
-    return x * 10000 + y * 100 + z;
+    if (std::sscanf(FRP_VERSION, "%d.%d.%d", &x, &y, &z) == 3)
+        return x * 10000 + y * 100 + z;
+    if (std::sscanf(FRP_VERSION, "%d.%d", &x, &y) == 2 && x >= 20000101)
+        return (x - 20000000) * 10 + (y < 0 ? 0 : y > 9 ? 9 : y);
+    return 0;
 }
 
 mpc::PluginInfo makeInfo()
