@@ -326,7 +326,7 @@ plugin-hosts: plugin       ## macOS: the VST3 / AU in Apple's AU host and a JUCE
 # with the MPC Plugin SDK's toolchain (zig; the SDK fetched into .local/mpc-sdk on first use). Nothing is installed.
 MPC_J ?= 2
 MPC_VER ?= $(shell cat VERSION)
-.PHONY: mpc mpc-catalog test-mpc dist
+.PHONY: mpc mpc-catalog test-mpc dist publish
 mpc:                       ## build/mpc: the plugin folder (both ARM builds, validated), frodhes-bark-<VER>-mpc.zip, native test build
 	nice -n 15 $(PY) mpc/build.py --target all --tools --version $(MPC_VER) -j$(MPC_J)
 
@@ -345,6 +345,9 @@ dist:                      ## build all 5 release artifacts for VERSION + build/
 	  "frodhes-bark-$$VER-smk37-mke.fwsc" \
 	  "frodhes-bark-$$VER-mpc.zip" > SHA256SUMS.txt) && \
 	cat build/SHA256SUMS.txt
+
+publish:                   ## validate fmhub.json, build all 5 release artifacts, push main, and publish GitHub release (Hub auto-updates)
+	$(PY) tools/publish.py
 
 mpc-catalog: mpc           ## build/mpc/Frodhes-<MPC_VER>-mpc-{armv7,aarch64}.zip: the open-mpc catalogue's per-build zips from the
                            ## plugin folder (tools/mpc_catalog_zip.py; its installer templates fetched once, pinned by sha256)
