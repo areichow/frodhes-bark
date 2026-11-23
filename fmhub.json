@@ -1,0 +1,13 @@
+{
+  "what": "A physically modeled electric piano (Rhodes and Wurlitzer 140B and 200A), vibraphone, and marimba with calibrated bark, studio stereo FX, a 6-point velocity curve editor, black-key velocity offset, arpeggiator, sequencer, and 31 factory presets. No samples.",
+  "author": "Aaron Reichow",
+  "kinds": ["synth"],
+  "image": "docs/card.png",
+  "color": "#E68418",
+  "sounds": "none – all synthesised",
+  "smk37": {
+    "what": "A physically modeled electric piano (Rhodes and Wurlitzer 140B and 200A), vibraphone, and marimba for the SMK-37, with calibrated bark, studio stereo FX, velocity curve editor, black-key velocity offset, arpeggiator, and 31 presets.",
+    "image": "docs/card.png",
+    "guide": "https://github.com/areichow/frodhes-bark/blob/main/docs/SMK37.md"
+  }
+}
